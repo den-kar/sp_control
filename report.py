@@ -17,6 +17,7 @@ from zipfile import ZipFile
 # -------------------------------------
 import cv2 as cv
 from fuzzywuzzy import fuzz
+import numpy as np
 from pandas import DataFrame, ExcelWriter, read_excel, to_datetime
 from pytesseract import pytesseract
 # -------------------------------------
@@ -88,6 +89,15 @@ WEEKDAYS = (
 # -------------------------------------
 MARGIN = 4
 NAME_SHARE = .29
+_factor = 20
+SHARP_KERNEL = np.array(
+  (
+    [-_factor + 3, 0, -_factor + 1]
+    , [-_factor + 2, 6 * _factor - 8, -_factor]
+    , [-_factor + 3, 0, -_factor + 1]
+  )
+  , dtype=np.uint8
+)
 # -------------------------------------
 BR = '\n-----'
 NL = '\n'
@@ -205,6 +215,13 @@ VAL = 'value'
 V_AL = 'valign'
 V_CE = 'vcenter'
 ZP = '0%'
+COND_FMT = {
+  AVA: {TYP: 'text', CRI: 'ends with', VAL: ' '}
+  , MIN: {TYP: 'cell', CRI: '==', VAL: '"NO DATA"'}
+  , 'scale': {
+    TYP: CO_SC, MIN_T: NU, MID_T: NU, MAX_T: NU, MIN_V: 0, MID_V: .5, MAX_V: 1
+  }
+}
 FMT_DICT = {
   'border': {TOP: 1}
   , 'comment': {FO_SI: 10, V_AL: V_CE, BOLD: True}
@@ -214,13 +231,38 @@ FMT_DICT = {
   , 'red': {BOLD: True, BG_COL: '#CE2121'}
   , 'text': {FO_SI: 10, V_AL: V_CE, ALI: LEF}
 }
-COND_FMT = {
-  AVA: {TYP: 'text', CRI: 'ends with', VAL: ' '}
-  , MIN: {TYP: 'cell', CRI: '==', VAL: '"NO DATA"'}
-  , 'scale': {
-    TYP: CO_SC, MIN_T: NU, MID_T: NU, MAX_T: NU, MIN_V: 0, MID_V: .5, MAX_V: 1
-  }
-}
+RIDER_MIN_COL_FMT = (
+  ('A:A', 35, 'text')
+  , ('B:B', 20, 'text')
+  , ('C:C', 15, 'int')
+  , ('D:D', 35, 'text')
+)
+XLS_REPORT_COL_FMT = (
+  ('A:A', 5, 'int')
+  , ('B:B', 28, 'text')
+  , ('C:C', 11, 'text')
+  , ('D:D', 4, 'int')
+  , ('E:E', 9, 'int')
+  , ('F:F', 4, 'int')
+  , ('G:G', 5, 'int')
+  , ('H:I', 9, 'ratio')
+  , ('J:J', 31, 'text')
+  , ('K:K', 23, 'text')
+  , ('L:L', 8, 'ratio')
+  , ('M:M', 6, 'int')
+  , ('N:P', 7, 'int')
+  , ('Q:Q', 6, 'int')
+  , ('R:R', 27, 'comment')
+  , ('S:S', 5, 'int')
+  , ('T:T', 4, 'int')
+  , ('U:U', 12, 'comment')
+)
+XLS_REPORT_COND_FMT = (
+  ('H2:I', 'scale', None)
+  , ('L2:L', 'scale', None)
+  , ('E2:E', MIN, 'red')
+  , ('K2:K', AVA, 'error')
+)
 # -------------------------------------
 
 # -------------------------------------
@@ -444,31 +486,30 @@ def load_shift_xlsx_into_df(df):
 # -------------------------------------
 
 # -------------------------------------
+def load_xlsx_city_in_filename(city, filename):
+  return (
+    filename.endswith('xlsx')
+    and filename[0].isalpha()
+    and any(fuzz.partial_ratio(alias, filename) > 86 for alias in ALIAS[city])
+  )
+# -------------------------------------
+
+# -------------------------------------
 def load_xlsx_data_into_dfs(city, kw_dir, log):
   missing_files = [ALIAS[AVA][0], ALIAS[SHI][0]]
   dfs = {MON: None}
   for filename in listdir(kw_dir):
-    if not (
-      filename.endswith('xlsx') and filename[0].isalpha() and any(
-        fuzz.partial_ratio(alias, filename) > 86 for alias in ALIAS[city]
-      )
-    ):
+    if not load_xlsx_city_in_filename(city, filename):
       continue
     df = read_excel(join(kw_dir, filename))
     df.rename(columns=lambda x: str(x).strip(), inplace=True)
-    if any(
-      fuzz.partial_ratio(avail_kw, filename) > 86 for avail_kw in ALIAS[AVA]
-    ):
+    if any(fuzz.partial_ratio(alias, filename) > 86 for alias in ALIAS[AVA]):
       dfs[AVA] = load_avail_xlsx_into_df(df)
       missing_files.remove(ALIAS[AVA][0])
-    elif any(
-      fuzz.partial_ratio(shift_kw, filename) > 86 for shift_kw in ALIAS[SHI]
-    ):
+    elif any(fuzz.partial_ratio(alias, filename) > 86 for alias in ALIAS[SHI]):
       dfs[SHI] = load_shift_xlsx_into_df(df)
       missing_files.remove(ALIAS[SHI][0])
-    elif any(
-      fuzz.partial_ratio(month_kw, filename) > 86 for month_kw in ALIAS[MON]
-    ):
+    elif any(fuzz.partial_ratio(alias, filename) > 86 for alias in ALIAS[MON]):
       dfs[MON] = df
   if missing_files:
     dfs = None
@@ -509,37 +550,20 @@ def png_avail_cell_is_filled(img, top, bot, x_test):
 # -------------------------------------
 
 # -------------------------------------
-def png_capture_grid(image, first_x=1, x_search_range=50):
+def png_capture_grid(image):
   columns = None
   rows = None
   img_height, img_width = image.shape
   # ----------
-  for x_value in range(first_x, x_search_range):
-    line_cnt = 0
-    rows = [0]
-    y_value = 0
-    for y_value in range(MARGIN, img_height - MARGIN):
-      pixel_color = image[y_value, x_value]
-      if pixel_color != COLOR['white']:
-        if pixel_color in COLOR['NP']:
-          continue
-        elif line_cnt == 10:
-          break
-        elif y_value <= rows[-1] + 10:
-          line_cnt += 1
-          rows.pop()
-        else:
-          line_cnt = 0
-        rows.append(y_value)
-      if len(rows) == 2 and y_value > rows[1] + 70:
-        break
-      if y_value == 185 and len(rows) < 3:
-        break
-    if y_value == img_height - 5:
-      first_x = x_value
-      break
-  rows.append(img_height)
+  rows, first_x = png_capture_grid_rows(image, img_height)
+  rows, columns = png_capture_grid_cols(image, img_width, rows, first_x)
   # ----------
+  return rows, len(rows) - 1, (columns, len(columns), first_x, columns[0])
+# -------------------------------------
+
+# -------------------------------------
+def png_capture_grid_cols(image, img_width, rows, first_x):
+  columns = None
   for row in rows[(1 if len(rows) == 2 else 2):]:
     columns = [first_x]
     for x_value in range(first_x, img_width - MARGIN):
@@ -565,7 +589,39 @@ def png_capture_grid(image, first_x=1, x_search_range=50):
   if image[rows[1] - 15, columns[0] + 1] == COLOR['time_field_bg']:
     rows.pop(0)
   # ----------
-  return rows, len(rows) - 1, (columns, len(columns), first_x, columns[0])
+  return rows, columns
+# -------------------------------------
+
+# -------------------------------------
+def png_capture_grid_rows(image, img_height, first_x=1, x_search_range=50):
+  rows = None
+  for x_value in range(first_x, x_search_range):
+    line_cnt = 0
+    rows = [0]
+    y_value = 0
+    for y_value in range(MARGIN, img_height - MARGIN):
+      pixel_color = image[y_value, x_value]
+      if pixel_color != COLOR['white']:
+        if pixel_color in COLOR['NP']:
+          continue
+        if line_cnt == 10:
+          break
+        if y_value <= rows[-1] + 10:
+          line_cnt += 1
+          rows.pop()
+        else:
+          line_cnt = 0
+        rows.append(y_value)
+      if len(rows) == 2 and y_value > rows[1] + 70:
+        break
+      if y_value == 185 and len(rows) < 3:
+        break
+    if y_value == img_height - 5:
+      first_x = x_value
+      break
+  rows.append(img_height)
+  # ----------
+  return rows, first_x
 # -------------------------------------
 
 # -------------------------------------
@@ -576,20 +632,21 @@ def png_get_current_date(day_str, kw_dates:list):
 # -------------------------------------
 def png_name_determination(rider_names, ocr_name, det_name):
   char_cnt = len(ocr_name)
-  for rider_name in rider_names:
-    query = rider_name[:char_cnt]
-    slice_similarity = fuzz.WRatio(ocr_name, query)
-    if slice_similarity >= 87:
-      det_name = rider_name
-      break
-    partial_similarity = fuzz.partial_ratio(ocr_name, query)
-    if partial_similarity >= 88:
-      det_name = rider_name
-      break
-    if slice_similarity >= 70:
-      det_name.append((slice_similarity, rider_name, ocr_name, 'slice'))
-    if partial_similarity >= 70:
-      det_name.append((partial_similarity, rider_name, ocr_name, 'partial'))
+  if char_cnt >= 5:
+    for rider_name in rider_names:
+      query = rider_name[:char_cnt]
+      slice_similarity = fuzz.WRatio(ocr_name, query)
+      if slice_similarity >= 87:
+        det_name = rider_name
+        break
+      partial_similarity = fuzz.partial_ratio(ocr_name, query)
+      if partial_similarity >= 88:
+        det_name = rider_name
+        break
+      if slice_similarity >= 70:
+        det_name.append((slice_similarity, rider_name, ocr_name, 'slice'))
+      if partial_similarity >= 70:
+        det_name.append((partial_similarity, rider_name, ocr_name, 'partial'))
   return det_name
 # -------------------------------------
 
@@ -618,9 +675,7 @@ def png_one_row_determine_rider_name(
     log += print_no_name_determined(png, row_n, ocr_read)
   elif isinstance(det_name, list):
     if len(det_name) > len(alt_imgs) + 1:
-      det_name, log = print_naming_multi_match(
-        png, row_n, det_name, ocr_read, log
-      )
+      det_name, log = print_multi_match(png, row_n, det_name, ocr_read, log)
     else:
       det_name = max(det_name)[1]
   return det_name, ocr_read, log
@@ -672,7 +727,6 @@ def png_read_out_one_row(
   png, img, alt_imgs, grid_values, row_n, row, next_row, data, log, args
 ):
   columns, col_cnt, first_x, first_col = grid_values
-  date_str, day, png_idx, city, kw, riders = args
   if png_one_row_no_data(
     img
     , y_up=row + 1
@@ -683,6 +737,7 @@ def png_read_out_one_row(
     data[CNT][NODA] += 1
 # ----------
   else:
+    date_str, day, png_idx, city, kw, riders = args
     daily_avail, daily_h, extra_h = png_one_row_get_availabities(
       img, row + 1, next_row - 4, columns, col_cnt, date_str
     )
@@ -716,8 +771,9 @@ def png_read_out_one_row(
 def png_read_out_screenshot(png_dir, png_cnt, png_n, png, data, log, *args):
   img = cv.imread(join(png_dir, png), cv.IMREAD_GRAYSCALE)
   alt_imgs = [
-    cv.threshold(img, threshold, 255, cv.THRESH_BINARY)[1]
-    for threshold in (212, 202, 220, 195)
+    cv.filter2D(img, -1, SHARP_KERNEL)
+    , cv.threshold(img, 212, 255, cv.THRESH_BINARY)[1]
+    , cv.threshold(img, 220, 255, cv.THRESH_BINARY)[1]
   ]
 # ----------
   rows, row_cnt, grid_values = png_capture_grid(img)
@@ -766,17 +822,6 @@ def print_log_header(text='', fil='=', pre='-', suf='-', brk=BR):
 # -------------------------------------
 
 # -------------------------------------
-def print_naming_multi_match(png, row_n, det_name, ocr_read, log):
-  log += print_log(
-    f'{MULTI_MATCH}{png = }, {row_n = }, {ocr_read = }', '[] [] '
-  )
-  for similarity, name, ocr, source in det_name:
-    log += f'{TAB}{ocr = }, {name = }, {source = }, {similarity = }{NL}'
-  det_name = max(det_name)[1]
-  return det_name, log + print_log(f' stored at: {det_name}', TAB, BR)
-# -------------------------------------
-
-# -------------------------------------
 def print_no_name_determined(png, row_n, ocr_read):
   print('\r', end='')
   return print_log(
@@ -784,6 +829,17 @@ def print_no_name_determined(png, row_n, ocr_read):
     + (f'{NL}|OCR| {ocr_read = }' if ocr_read else '')
     , '##### ', BR
   )
+# -------------------------------------
+
+# -------------------------------------
+def print_multi_match(png, row_n, det_name, ocr_read, log):
+  log += print_log(
+    f'{MULTI_MATCH}{png = }, {row_n = }, {ocr_read = }', '[] [] '
+  )
+  for similarity, name, ocr, source in det_name:
+    log += f'{TAB}{ocr = }, {name = }, {source = }, {similarity = }{NL}'
+  det_name = max(det_name)[1]
+  return det_name, log + print_log(f' stored at: {det_name}', TAB, BR)
 # -------------------------------------
 
 # -------------------------------------
@@ -917,10 +973,8 @@ def rider_mindeststunden_style_and_save_xlsx(df_min, city):
   workbook = writer.book
   worksheet = writer.sheets[city]
   fmt = {k: workbook.add_format(FMT_DICT[k]) for k in ('int', 'red', 'text')}
-  worksheet.set_column('A:A', 35, fmt['text'])
-  worksheet.set_column('B:B', 20, fmt['text'])
-  worksheet.set_column('C:C', 15, fmt['int'])
-  worksheet.set_column('D:D', 35, fmt['text'])
+  for column, width, fmt_key in RIDER_MIN_COL_FMT:
+    worksheet.set_column(column, width, fmt[fmt_key])
   worksheet.conditional_format(
     f'C2:C{df_min.shape[0] + 1}', {**COND_FMT[MIN], 'format': fmt['red']}
   )
@@ -943,33 +997,14 @@ def save_df_in_formated_xlsx(kw, city, df):
   worksheet.autofilter('A1:U1')
   worksheet.freeze_panes(1, 2)
   worksheet.set_row(row_cnt, None, fmt_dict['border'])
-  worksheet.set_column('A:A', 5, fmt_dict['int'])
-  worksheet.set_column('B:B', 28, fmt_dict['text'])
-  worksheet.set_column('C:C', 11, fmt_dict['text'])
-  worksheet.set_column('D:D', 4, fmt_dict['int'])
-  worksheet.set_column('E:E', 9, fmt_dict['int'])
-  worksheet.set_column('F:F', 4, fmt_dict['int'])
-  worksheet.set_column('G:G', 5, fmt_dict['int'])
-  worksheet.set_column('H:I', 9, fmt_dict['ratio'])
-  worksheet.set_column('J:J', 31, fmt_dict['text'])
-  worksheet.set_column('K:K', 23, fmt_dict['text'])
-  worksheet.set_column('L:L', 8, fmt_dict['ratio'])
-  worksheet.set_column('M:M', 6, fmt_dict['int'])
-  worksheet.set_column('N:P', 7, fmt_dict['int'])
-  worksheet.set_column('Q:Q', 6, fmt_dict['int'])
-  worksheet.set_column('R:R', 27, fmt_dict['comment'])
-  worksheet.set_column('S:S', 5, fmt_dict['int'])
-  worksheet.set_column('T:T', 4, fmt_dict['int'])
-  worksheet.set_column('U:U', 12, fmt_dict['comment'])
+  for column, width, fmt in XLS_REPORT_COL_FMT:
+    worksheet.set_column(column, width, fmt_dict[fmt])
   # ----- add conditional formats -----
-  worksheet.conditional_format(f'H2:I{row_cnt}', COND_FMT['scale'])
-  worksheet.conditional_format(f'L2:L{row_cnt}', COND_FMT['scale'])
-  worksheet.conditional_format(
-    f'E2:E{row_cnt}', {**COND_FMT[MIN], 'format': fmt_dict['red']}
-  )
-  worksheet.conditional_format(
-    f'K2:K{row_cnt}', {**COND_FMT[AVA], 'format': fmt_dict['error']}
-  )
+  for cols, cond, fmt in XLS_REPORT_COND_FMT:
+    worksheet.conditional_format(
+      f'{cols}{row_cnt}'
+      , {**COND_FMT[cond], 'format': fmt_dict[fmt]} if fmt else COND_FMT[cond]
+    )
   # ----- save xlsx-file -----
   writer.save()
 # ----------
@@ -1004,10 +1039,7 @@ def zip_extract_screenshots(city, dirs, merge_pngs=False):
   log = print_log_header(UNZIP_MSG)
   log += print_log(ZIP_PNG_NAME_CHECK_MSG, '[X|O] ')
   # ----------
-  for zip_file in (
-    fn for fn in listdir(dirs[0])
-    if fn.endswith('.zip') and any(kw in fn.casefold() for kw in ALIAS[city])
-  ):
+  for zip_file in zip_get_city_files(city, dirs[0]):
     log += print_log(zip_file, TAB)
     with ZipFile(join(dirs[0], zip_file)) as zfile:
       day = WEEKDAYS[1]
@@ -1029,14 +1061,27 @@ def zip_extract_screenshots(city, dirs, merge_pngs=False):
 # -------------------------------------
 
 # -------------------------------------
+def zip_get_city_files(city, kw_dir):
+  return (
+    fn for fn in listdir(kw_dir)
+    if fn.endswith('.zip') and any(ac in fn.casefold() for ac in ALIAS[city])
+  )
+# -------------------------------------
+
+# -------------------------------------
+def zip_merge_get_daily_files(Image, png_dir, day):
+  return [
+      Image.open(join(png_dir, day_fn))
+      for day_fn in sorted(fn for fn in listdir(png_dir) if day in fn)
+    ]
+# -------------------------------------
+
+# -------------------------------------
 def zip_merge_png_files_per_day(city, dirs):
   from PIL import Image
   log = print_log_header(MERGE_FILES_MSG)
   for day in WEEKDAYS:
-    images = [
-      Image.open(join(dirs[3], day_fn))
-      for day_fn in sorted(fn for fn in listdir(dirs[3]) if day in fn)
-    ]
+    images = zip_merge_get_daily_files(Image, dirs[3], day)
     widths, heights = zip(*(img.size for img in images))
     new_image = Image.new('RGB', (max(widths), sum(heights)))
     y_offset = 0
@@ -1085,8 +1130,8 @@ def main(kw, cities, get_avails, merge_pngs, unzip_only):
   screen_dir = join(kw_dir, 'Screenshots')
   for city in cities:
     png_dir = check_make_dir(screen_dir, city)
-    dirs = (kw_dir, log_dir, screen_dir, png_dir)
   # ----------
+    dirs = (kw_dir, log_dir, screen_dir, png_dir)
     log += shiftplan_check(kw, city, get_avails, merge_pngs, unzip_only, dirs)
   # ----------
   log += print_log_header(

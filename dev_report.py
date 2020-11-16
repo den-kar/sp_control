@@ -976,7 +976,9 @@ def rider_ersterfassung_update_names(kw, city, ree_dir, dfs, log):
         data_list.append(rider_ee_new_entry(city, name, contract, kw_date))
         log += print_log(f'{name = }, {contract = }', '\t- ')
       elif name in known:
-        dfs[EE].at[dfs[EE][ree_names == name].index[0], LAS_ENT] = kw_date
+        rider_ee_idx = dfs[EE][ree_names == name].index[0]
+        if kw_date > dfs[EE].at[rider_ee_idx, LAS_ENT]:
+          dfs[EE].at[rider_ee_idx, LAS_ENT] = kw_date
     if new_names:
       log += print_log('-----')
   dfs[EE] = dfs[EE].append(data_list, ignore_index=True)

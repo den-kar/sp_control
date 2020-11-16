@@ -62,7 +62,7 @@ Schichtplan
 ```
 
 #### 3.1 sp_control.py erstellen
-1. auf [sp_control.py](https://github.com/den-kar/sp_control/blob/master/sp_control.py) gehen
+1. [sp_control.py](https://github.com/den-kar/sp_control/blob/master/sp_control.py) auf github öffnen
 1. auf `Raw` klicken (eine Zeile über dem Code, rechte Seite)
 1. kompletten Text markieren `STRG + A` und in Zwischenablage kopieren `STRG + C`
 1. Neue Textatei erstellen
@@ -81,10 +81,10 @@ Schichtplan
     }
     "cities": ["Frankfurt", "Offenbach"],
     "aliases": {
-        "Frankfurt": ["frankfurt", "ffm", "frankfurt am main"]
-        "Offenbach": ["offenbach", "of", "offenbach am main"]
-        "avail": ["Verfügbarket", "Verfügbarkeiten"]
-        "month": ["Monatsstunden", "Stunden"]
+        "Frankfurt": ["frankfurt", "ffm", "frankfurt am main"],
+        "Offenbach": ["offenbach", "of", "offenbach am main"],
+        "avail": ["Verfügbarket", "Verfügbarkeiten"],
+        "month": ["Monatsstunden", "Stunden"],
         "shift": ["Schichtplan", "Schichtplanung"]
     }
 }
@@ -102,30 +102,30 @@ Die Datei ist optional und wird nur beim aller ersten Run genutzt. Die Daten wer
 
 - xlsx Datei mit bekannten Ridern
 - ein Reiter je Stadt
-- Header mit Beispiel Eintrag
 
+Header mit Beispiel Eintrag
 rider name | contract type | min | city | first_entry | last_entry
 -|-|-|-|-|-
 Jane Doe | Minijob | 5 | Offenbach | 2019-06-01 | 2020-11-16
 
   - first_entry und last_entry Datumsformat: "YYYY-MM-DD"
-  - Verwendete Mindeststunden:
-```v
-  "Foodora_Minijob": 5,
-  "Foodora_Working Student": 12,
-  "Midijob": 12,
-  "Minijob": 5,
-  "Minijobber": 5,
-  "Mini-Jobber": 5,
-  "TE Midijob": 12,
-  "TE Minijob": 5,
-  "TE Teilzeit": 30,
-  "TE Werkstudent": 12,
-  "TE WS": 12,
-  "Teilzeit": 30,
-  "Vollzeit": 30,
-  "Werk Student": 12
-```
+
+Verwendete Mindeststunden
+Vertragsart | Wochen-Mndeststunden
+-|-
+Foodora_Working Student | 12
+Midijob                 | 12
+Minijob                 |  5
+Minijobber              |  5
+Mini-Jobber             |  5
+TE Midijob              | 12
+TE Minijob              |  5
+TE Teilzeit             | 30
+TE Werkstudent          | 12
+TE WS                   | 12
+Teilzeit                | 30
+Vollzeit                | 30
+Werk Student            | 12
 
 ---
 ### Anwendung

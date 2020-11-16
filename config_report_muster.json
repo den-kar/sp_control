@@ -1,0 +1,13 @@
+{
+  "tesseract": {
+    "cmd_path": "C:\\Tesseract-ocr\\tesseract.exe"
+  },
+  "cities": ["Frankfurt", "Offenbach"],
+  "aliases": {
+    "Frankfurt": ["frankfurt", "ffm", "frankfurt am main"],
+    "Offenbach": ["offenbach", "of", "offenbach am main"],
+    "avail": ["Verfügbarkeit", "Verfügbarkeiten"],
+    "month": ["Monatsstunden", "Stunden"],
+    "shift": ["Schichtplan", "Schichtplanung"]
+  }
+}

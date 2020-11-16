@@ -103,15 +103,16 @@ Die Datei ist optional und wird nur beim aller ersten Run genutzt. Die Daten wer
 - xlsx Datei mit bekannten Ridern
 - ein Reiter je Stadt
 
-Header mit Beispiel Eintrag
+- Excel Kopfzeile mit Beispiel Eintrag
+
 rider name | contract type | min | city | first_entry | last_entry
 -|-|-|-|-|-
 Jane Doe | Minijob | 5 | Offenbach | 2019-06-01 | 2020-11-16
 
-  - first_entry und last_entry Datumsformat: "YYYY-MM-DD"
+  - first_entry und last_entry Datumsformat: **YYYY-MM-DD**
+  - Verwendete wöchtenliche Mindeststunden
 
-Verwendete Mindeststunden
-Vertragsart | Wochen-Mndeststunden
+Vertragsart | Stunden
 -|-
 Foodora_Working Student | 12
 Midijob                 | 12

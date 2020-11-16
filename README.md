@@ -2,6 +2,11 @@
 Tool zur Erstellung eines Schichtplan-Kontroll-Reports. **sp_control** wird von einem Terminal mit eingerichteter und aktivierter Python-Umgebung aus genutzt und bietet durch Eingabe von Parametern zuschaltbare Funktionen.
 
 ---
+### Installation
+
+Vollständige Anleitung [INSTALL.md](https://github.com/den-kar/sp_control/blob/master/INSTALL.md)
+
+---
 ### Anwendung
 
 ```d
@@ -59,8 +64,3 @@ sp_control-master
 ├── Rider_Ersterfassung.xlsx (optional)
 └── sp_control.py
 ```
-
----
-### Installation
-
-Vollständige Anleitung [INSTALL.md](https://github.com/den-kar/sp_control/blob/master/INSTALL.md)

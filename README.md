@@ -1,58 +1,63 @@
-# shiftplaner
-Shift plan control tool
-
-#### 1 Anaconda installieren
-- Passenden Installer runterladen https://www.anaconda.com/products/individual
-- Installationsverzeichnis auswählen und Pfad zur installierten python.exe aufsschreiben (z.B. **C:\\Anaconda3**)
-- Anleitung zur Installation auf Linux https://docs.continuum.io/anaconda/install/linux/
-- Anleitung zur Installation auf Windows https://docs.continuum.io/anaconda/install/windows/
+# sp_control
+Tool zur Erstellung eines Schichtplan-Kontroll-Reports. **sp_control** wird von einem Terminal mit eingerichteter und aktivierter Python-Umgebung aus genutzt und bietet durch Eingabe von Parametern zuschaltbare Funktionen.
 
 ---
-#### 2 Tesseract installieren
-##### Linux
-> sudo apt-get install tesseract-ocr -y
+### Anwendung
 
-##### Windows
-- Installer runterladen	https://github.com/UB-Mannheim/tesseract/wiki
-- Installationsverzeichnis auswählen und Pfad zur installierten *tesseract.exe* aufsschreiben (z.B. **C:\\Tesseract-OCR**)
+```d
+report.py [-h] --kalenderwoche KALENDERWOCHE [--last_kw LAST_KW] [--cities [CITIES [CITIES ...]]] [--getavails] [--mergeperday] [--unzip_only]
+```
 
-WARNUNG: Tesseract sollte entweder in das Verzeichnis, das bei der Installation vorgeschlagen wird, oder in ein neues Verzeichnis installiert werden. Das Deinstallationsprogramm entfernt das gesamte Installationsverzeichnis. Wenn Tesseract in ein bestehendes Verzeichnis installiert wurde, wird dieses Verzeichnis mit all seinen Unterverzeichnissen und Dateien entfernt.
+#### Parameter
+```v
+Pflichtparameter:
+--kalenderwoche, -k  erste zu bearbeitende Kalenderwoche als Zahl
+
+Optionale Parameter:
+--last_kw, -lm       letzte zu bearbeitende Kalenderwoche als Zahl
+--cities, -c         zu bearbeitende Städte; einzeln aufführen, trennen mit Leerzeichen
+--getavails, -a      Auslesen von Verfügbarkeiten aus Screenshots aktivieren
+--mergeperdaz, -m    Erzeugen zusammengefasster Screenshots je Stadt und Tag
+--unzip_only, -z     zip Dateien mit Screenshots entpacken und shiftplaner beenden
+```
+
+#### Terminal mit Python Umgebung öffnen
+**Linux**
+  1. `STRG + ALT + T` drücken
+  1. `conda activate Takeaway` eingeben
+
+**Windows**
+  1. `Windows-Taste` drücken
+  1. `Anaconda Prompt` eingeben
+  1. mit `Enter` bestätigen
+
+#### Beispielanwendungen
+
+**Standard Wochenreport**
+  - Kalenderwoche 47, default Städte, Verfügbarkeiten auslesen
+> report.py -kw 47 -a
+
+**Erstellung vollständiger `Rider_Ersterfassung_<STADTNAME>.xlsx` Datei**
+  - ab KW 1, bis KW 47, nur Frankfurt, ohne auslesen der Verfügbarkeiten
+> report.py -kw 1 -l 47 -c Frankfurt
 
 ---
-#### 3 conda und tesseract zu Umgebungsvariablen hinzufügen
-##### Windows
-- Windows-Taste drücken, "Umgebung" eingeben 
-- "Systemumgebungsvariablen bearbeiten" anklicken (oder Enter drücken)
-- Im neuen Fenster "Systemeigenschaften" auf den Reiter "Erweitert" gehen
-- Button "Umgebungsvariablen" klicken
-- Im neuen Fenster "Umgebungsvariablen" im oberen Abschnitt "Benutzervariablen für ..." nach der Variablen "Path" (oder "PATH") suchen
-- bei vorhandener "Path" Variable auf "Bearbeiten..." Button klicken
-	1. Doppelklick auf leere Zeile -> Pfad aus Schritt 1 einfügen und mit Enter bestätigen (z.b. **C:\\Anaconda3**)
-	3. Doppelklick auf leere Zeile -> Pfad aus 1 + "\\condabin" einfügen und mit Enter bestätigen (z.b. **C:\\Anaconda3\\condabin**)
-	4. Doppelklick auf leere Zeile -> Pfad aus Schritt 2 einfügen und mit Enter bestätigen (z.b. **C:\\Tesseract-OCR**)
--  wenn keine "Path" Variable vorhanden ist, auf "Neu..." Button klicken:
-	- Name der Variablen: "Path"
-	- Wert der Variablen: Pfade aus Schritt 1 und 2, getrennt durch ein Semikolon (z.B. **"C:\\Anaconda3;C:\\Anaconda3\\condabin;C:\\Tesseract-OCR"**)
+### Schichtplan Arbeitsordner Struktur
+```v
+Schichtplan
+├── Schichtplan_bearbeitet (wird autom. erstellt)
+│   └── KW<Kalenderwoche>_<Stadtname>.xlsx (je Report eine xlsx)
+├── Rider_Ersterkennung (wird autom. erstellt)
+│   └── Rider_Ersterkennung_<Stadtname>.xlsx (je Stadt eine xlsx)
+├── KW<Kalenderwoche> (ein Ordner je Schichtplan Datenpaket)
+│   ├── .xlsx files (Schichtplan, Verfügbarkeiten, etc.)
+│   └── .zip files (Verfügbarkeiten Screenshots)
+├── config_report.json
+├── Rider_Ersterfassung.xlsx (optional)
+└── report.py
+```
 
 ---
-#### 4.0 Einrichtung einer neuen Python Umgebung (optional)
-> conda create -n Takeaway python=3.8.5
+### Installation
 
-BEACHTEN: Um in der Takeaway Python Umgebung zu arbeiten, muss in die Umgebung **vor** der Nutzung aktiviert werden:
-- Terminal/Console/Command Prompt öffnen
-	###### Linux
-	- gleichzeitiges drücken von "STRG" + "ALT" + "T"
-	###### Windows
-	- Windows-Taste drücken, "cmd" eingeben, mit Enter bestätigen
-
-- Im Terminal/Console/Command Prompt eingeben und mit Enter bestätigen
-> conda activate Takeaway
-
----
-#### 4 Installation der python packages
-> conda install -c conda-forge pandas pillow xlrd xlsxwriter opencv fuzzywuzzy pytesseract -y
----
-#### 5 report.config erstellen im Schichtplan Ordner
-- Neue Textatei erstellen
-- In Texteditor öffnen
-- 
+Vollständige Anleitung [INSTALL.md](.../INSTALL.md)

@@ -432,11 +432,11 @@ def get_availability_data(df_row):
 # -------------------------------------
 
 # -------------------------------------
-def get_rider_min_hours(df_min, contract, rider_name):
+def get_rider_min_hours(df_ee, contract, rider_name):
   return {
     MIN: CONTRACT_MIN_H[contract]
-    if 'TE' in contract or rider_name not in df_min[RID_NAM].to_numpy()
-    else df_min[df_min[RID_NAM] == rider_name][MIN].item()
+    if 'TE' in contract or rider_name not in df_ee[RID_NAM].to_numpy()
+    else df_ee[df_ee[RID_NAM] == rider_name][MIN].item()
   }
 # -------------------------------------
 
@@ -494,17 +494,13 @@ def load_shift_xlsx_into_df(df):
   except (TypeError, ValueError):
     df[FR_HO] = to_datetime(df[FR_HO], format=HMS).dt.time
     df[TO_HO] = to_datetime(df[TO_HO], format=HMS).dt.time
-  return (
-    df.sort_values([DRI, SH_DA, FR_HO], ignore_index=True)
-  )
+  return df.sort_values([DRI, SH_DA, FR_HO], ignore_index=True)
 # -------------------------------------
 
 # -------------------------------------
 def load_ersterkennung_xlsx_into_df(city, ree_dir):
   try:
-    df_re = read_excel(
-      join(ree_dir, f'{EE}_{city}.xlsx')
-    )
+    df_re = read_excel(join(ree_dir, f'{EE}_{city}.xlsx'))
   except FileNotFoundError:
     try:
       df_re = read_excel(f'{EE}.xlsx', city)

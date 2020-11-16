@@ -487,17 +487,13 @@ def load_shift_xlsx_into_df(df):
   except (TypeError, ValueError):
     df[FR_HO] = to_datetime(df[FR_HO], format=HMS).dt.time
     df[TO_HO] = to_datetime(df[TO_HO], format=HMS).dt.time
-  return (
-    df.sort_values([DRI, SH_DA, FR_HO], ignore_index=True)
-  )
+  return df.sort_values([DRI, SH_DA, FR_HO], ignore_index=True)
 # -------------------------------------
 
 # -------------------------------------
 def load_ersterkennung_xlsx_into_df(city, ree_dir):
   try:
-    df_re = read_excel(
-      join(ree_dir, f'{EE}_{city}.xlsx')
-    )
+    df_re = read_excel(join(ree_dir, f'{EE}_{city}.xlsx'))
   except FileNotFoundError:
     try:
       df_re = read_excel(f'{EE}.xlsx', city)

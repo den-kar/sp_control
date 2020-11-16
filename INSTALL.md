@@ -68,7 +68,7 @@ sp_control-master
   - auf [sp_control Projektseite](https://github.com/den-kar/sp_control) gehen
   - grünes Feld `Code` anklicken
   - im neu geöffneten Frame `Download ZIP` anklicken
-  - beinhaltetes Ordner `sp_control` in das gewünschte lokale Verzeichnis entpacken
+  - gezippten Ordner `sp_control-master` in das gewünschte lokale Verzeichnis entpacken
 
 ##### 3.2A **config_report_muster.json bearbeiten**
   - Datei an den eigenen Standort anpassen

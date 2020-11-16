@@ -63,19 +63,23 @@ sp_control-master
 ```
 
 #### Weg A - Arbeitsordner aus git-respository erstellen
+
 ##### 3.1A **git-repository runterladen**
   - auf [sp_control Projektseite](https://github.com/den-kar/sp_control) gehen
   - grünes Feld `Code` anklicken
   - im neu geöffneten Frame `Download ZIP` anklicken
   - beinhaltetes Ordner `sp_control` in das gewünschte lokale Verzeichnis entpacken
+
 ##### 3.2A **config_report_muster.json bearbeiten**
   - Datei an den eigenen Standort anpassen
   - Datei umbenennen in **config_report.json**
   - Beschreibung unter **3.2B**
+
 ##### 3.3A Rider_Ersterfassung_Muster.xlsx bearbeiten (optional)
   - Beschreibung unter **3.3B**
 
 #### Weg B - Dateien manuell erstellen
+
 ##### 3.1B sp_control.py erstellen
 1. [sp_control.py](https://github.com/den-kar/sp_control/blob/master/sp_control.py) auf github öffnen
 1. auf `Raw` klicken (eine Zeile über dem Code, rechte Seite)
@@ -147,7 +151,6 @@ Werk Student            | 12
 ### Anwendung
 
 **sp_control** wird von einem Terminal mit eingerichteter und aktivierter Python-Umgebung aus genutzt und bietet durch Eingabe von Parametern zuschaltbare Funktionen.
-
 ```d
 report.py [-h] --kalenderwoche KALENDERWOCHE [--last_kw LAST_KW] [--cities [CITIES [CITIES ...]]] [--getavails] [--mergeperday] [--unzip_only]
 ```
@@ -165,9 +168,21 @@ Optionale Parameter:
 --unzip_only, -z     zip Dateien mit Screenshots entpacken und shiftplaner beenden
 ```
 
+#### Terminal mit Python Umgebung öffnen und zum Arbeitsorder navigieren
+**Linux**
+  1. `STRG + ALT + T` drücken
+  1. `conda activate Takeaway` eingeben
+  1. zum Datei Verzeichnis navigieren mit `cd ~/pfad/zu/sp_control-master`
+
+**Windows**
+  1. `Windows-Taste` drücken
+  1. `Anaconda Prompt` eingeben
+  1. mit `Enter` bestätigen
+  1. zum Datei Verzeichnis navigieren mit `cd <LAUFWERK>:\pfad\zu\sp_control-master`
+
 #### Beispielanwendungen
 
-**Standard Wochenreport**
+**Kompletter Report `KW<KALENDERWOCHE>_<STADTNAME><YYYY_mm_dd_HH_MM_SS>.xlsx`**
   - Kalenderwoche 47, default Städte, Verfügbarkeiten auslesen
 > report.py -kw 47 -a
 

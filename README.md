@@ -25,11 +25,13 @@ Optionale Parameter:
 **Linux**
   1. `STRG + ALT + T` drücken
   1. `conda activate Takeaway` eingeben
+  1. zum Datei Verzeichnis navigieren mit `cd ~/pfad/zu/sp_control-master`
 
 **Windows**
   1. `Windows-Taste` drücken
   1. `Anaconda Prompt` eingeben
   1. mit `Enter` bestätigen
+  1. zum Datei Verzeichnis navigieren mit `cd <LAUFWERK>:\pfad\zu\sp_control-master`
 
 #### Beispielanwendungen
 

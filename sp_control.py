@@ -208,13 +208,6 @@ WEEKDAYS = (
 # -------------------------------------
 # ### DICTS ###
 # -------------------------------------
-ALIAS = {
-  'Frankfurt': {'frankfurt', 'ffm', 'frankfurt am main'}
-  , 'Offenbach': {'offenbach', 'of', 'offenbach am main'}
-  , AVA: ('Verfügbarkeit', 'Verfügbarkeiten')
-  , MON: ('Monatsstunden', 'Stunden')
-  , SHI: ('Schichtplan', 'Schichtplanung')
-}
 COLOR = {
   'black': 0
   , 'filled_av': 126
@@ -555,7 +548,6 @@ def load_xlsx_data_into_dfs(city, dirs, log):
 def parse_progress_bar(bar_len, prog, pre, suf):
   done = int(bar_len * prog)
   return f'{pre} [{"#" * done + "-" * (bar_len - done)}] {prog:.2%} {suf}'
-  # return f'{pre} [{"█" * done + "-" * (bar_len - done)}] {prog:.2%} {suf}'
 # -------------------------------------
 
 # -------------------------------------
@@ -786,7 +778,6 @@ def png_read_out_one_row(
       data[HRS][rider] += daily_h
       data[XTR][rider] += extra_h
       data[DON][rider].add(date_str)
-    # data = data, avail_str, ocr_read
   return data, log
 # -------------------------------------
 
@@ -800,15 +791,11 @@ def png_read_out_screenshot(png_dir, png_cnt, png_n, png, data, log, *args):
   ]
   rows, row_cnt, grid_values = png_capture_grid(img)
   data[CNT][SCAN] += row_cnt
-  # print(f'{png = }, first x = {grid_values[2]}, first col = {grid_values[3]}, row count = {len(rows)}, {rows = }, columns = {grid_values[0]}')
   for row_n, row in enumerate(rows[:-1], 1):
     print_progress_bar(png_cnt, png_n, row_cnt, row_n, png)
     data, log = png_read_out_one_row(
       png, img, alt_imgs, grid_values, row_n, row, rows[row_n], data, log, args
     )
-    # if isinstance(data, tuple):
-      # data, avails, ocr_read = data
-      # print(f'{row_n = }, {avails = }, {ocr_read = }')
   return data, log
 # -------------------------------------
 

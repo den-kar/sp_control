@@ -50,7 +50,7 @@ sp_control-master
 ├── Rider_Ersterfassung (wird autom. erstellt)
 │   └── Rider_Ersterfassung_<Stadtname>.xlsx (je Stadt eine xlsx)
 ├── Schichtplan_bearbeitet (wird autom. erstellt)
-│   └── KW<Kalenderwoche>_<Stadtname>.xlsx (je Report eine xlsx)
+│   └── KW<KALENDERWOCHE>_<STADTNAME>_<YYYY_mm_dd_HH_MM_SS>.xlsx (je Report eine xlsx)
 ├── Schichtplan_Daten
 │   └── KW<Kalenderwoche> (ein Ordner je Schichtplan Datenpaket)
 │       ├── .xlsx files (Schichtplan, Verfügbarkeiten, etc.)

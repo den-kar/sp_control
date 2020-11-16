@@ -50,11 +50,11 @@ Der Arbeitsordner hat folgende Struktur
 ```v
 sp_control-master
 ├── Rider_Ersterfassung (wird autom. erstellt)
-│   └── Rider_Ersterfassung_<Stadtname>.xlsx (je Stadt eine xlsx)
+│   └── Rider_Ersterfassung_<STADTNAME>.xlsx (je Stadt eine xlsx)
 ├── Schichtplan_bearbeitet (wird autom. erstellt)
-│   └── KW<Kalenderwoche>_<Stadtname>.xlsx (je Report eine xlsx)
+│   └── KW<KALENDERWOCHE>_<STADTNAME>_<YYYY_mm_dd_HH_MM_SS>.xlsx (je Report eine xlsx)
 ├── Schichtplan_Daten
-│   └── KW<Kalenderwoche> (ein Ordner je Schichtplan Datenpaket)
+│   └── KW<KALENDERWOCHE> (ein Ordner je Schichtplan Datenpaket)
 │       ├── .xlsx files (Schichtplan, Verfügbarkeiten, etc.)
 │       └── .zip files (Verfügbarkeiten Screenshots)
 ├── config_report.json
@@ -184,8 +184,8 @@ Optionale Parameter:
 
 **Kompletter Report `KW<KALENDERWOCHE>_<STADTNAME><YYYY_mm_dd_HH_MM_SS>.xlsx`**
   - Kalenderwoche 47, default Städte, Verfügbarkeiten auslesen
-> report.py -kw 47 -a
+> sp_control.py -kw 47 -a
 
 **Erstellung vollständiger `Rider_Ersterfassung_<STADTNAME>.xlsx` Datei**
   - ab KW 1, bis KW 47, nur Frankfurt, ohne auslesen der Verfügbarkeiten
-> report.py -kw 1 -l 47 -c Frankfurt
+> sp_control.py -kw 1 -l 47 -c Frankfurt

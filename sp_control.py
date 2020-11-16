@@ -167,6 +167,7 @@ OUTPUT_DIR = join(FILE_DIR, 'Schichtplan_bearbeitet')
 if not exists(OUTPUT_DIR):
   makedirs(OUTPUT_DIR)
 OUT_FILE_PRE = ''
+SPD_DIR = join(FILE_DIR, 'Schichtplan_Daten')
 UNASSIGNED_AVAILS_FN = f'unassigned_avails_{START_DT}.json'
 # -------------------------------------
 
@@ -1132,7 +1133,7 @@ def main(start_kw, last_kw, cities, get_avails, merge_pngs, unzip_only):
   if last_kw < start_kw:
     last_kw = start_kw 
   for kw in range(start_kw, last_kw + 1):
-    kw_dir = join(FILE_DIR, f'KW{kw}')
+    kw_dir = join(SPD_DIR, f'KW{kw}')
     if not exists(kw_dir):
       print(f'##### Couldn`t find "{kw_dir}" ...')
       return None

@@ -44,14 +44,15 @@ Optionale Parameter:
 ---
 ### Schichtplan Arbeitsordner Struktur
 ```v
-Schichtplan
-├── Schichtplan_bearbeitet (wird autom. erstellt)
-│   └── KW<Kalenderwoche>_<Stadtname>.xlsx (je Report eine xlsx)
+sp_control-master
 ├── Rider_Ersterfassung (wird autom. erstellt)
 │   └── Rider_Ersterfassung_<Stadtname>.xlsx (je Stadt eine xlsx)
-├── KW<Kalenderwoche> (ein Ordner je Schichtplan Datenpaket)
-│   ├── .xlsx files (Schichtplan, Verfügbarkeiten, etc.)
-│   └── .zip files (Verfügbarkeiten Screenshots)
+├── Schichtplan_bearbeitet (wird autom. erstellt)
+│   └── KW<Kalenderwoche>_<Stadtname>.xlsx (je Report eine xlsx)
+├── Schichtplan_Daten
+│   └── KW<Kalenderwoche> (ein Ordner je Schichtplan Datenpaket)
+│       ├── .xlsx files (Schichtplan, Verfügbarkeiten, etc.)
+│       └── .zip files (Verfügbarkeiten Screenshots)
 ├── config_report.json
 ├── Rider_Ersterfassung.xlsx (optional)
 └── sp_control.py

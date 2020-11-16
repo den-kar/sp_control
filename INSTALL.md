@@ -48,20 +48,35 @@ In Terminal mit aktivierter Python Umgeben eingeben
 Der Arbeitsordner hat folgende Struktur 
 
 ```v
-Schichtplan
-├── Schichtplan_bearbeitet (wird autom. erstellt)
-│   └── KW<Kalenderwoche>_<Stadtname>.xlsx (je Report eine xlsx)
+sp_control-master
 ├── Rider_Ersterfassung (wird autom. erstellt)
 │   └── Rider_Ersterfassung_<Stadtname>.xlsx (je Stadt eine xlsx)
-├── KW<Kalenderwoche> (ein Ordner je Schichtplan Datenpaket)
-│   ├── .xlsx files (Schichtplan, Verfügbarkeiten, etc.)
-│   └── .zip files (Verfügbarkeiten Screenshots)
+├── Schichtplan_bearbeitet (wird autom. erstellt)
+│   └── KW<Kalenderwoche>_<Stadtname>.xlsx (je Report eine xlsx)
+├── Schichtplan_Daten
+│   └── KW<Kalenderwoche> (ein Ordner je Schichtplan Datenpaket)
+│       ├── .xlsx files (Schichtplan, Verfügbarkeiten, etc.)
+│       └── .zip files (Verfügbarkeiten Screenshots)
 ├── config_report.json
 ├── Rider_Ersterfassung.xlsx (optional)
 └── sp_control.py
 ```
 
-#### 3.1 sp_control.py erstellen
+#### Weg A - Arbeitsordner aus git-respository erstellen
+##### 3.1A **git-repository runterladen**
+  - auf [sp_control Projektseite](https://github.com/den-kar/sp_control) gehen
+  - grünes Feld `Code` anklicken
+  - im neu geöffneten Frame `Download ZIP` anklicken
+  - beinhaltetes Ordner `sp_control` in das gewünschte lokale Verzeichnis entpacken
+##### 3.2A **config_report_muster.json bearbeiten**
+  - Datei an den eigenen Standort anpassen
+  - Datei umbenennen in **config_report.json**
+  - Beschreibung unter **3.2B**
+##### 3.3A Rider_Ersterfassung_Muster.xlsx bearbeiten (optional)
+  - Beschreibung unter **3.3B**
+
+#### Weg B - Dateien manuell erstellen
+##### 3.1B sp_control.py erstellen
 1. [sp_control.py](https://github.com/den-kar/sp_control/blob/master/sp_control.py) auf github öffnen
 1. auf `Raw` klicken (eine Zeile über dem Code, rechte Seite)
 1. kompletten Text markieren `STRG + A` und in Zwischenablage kopieren `STRG + C`
@@ -70,7 +85,7 @@ Schichtplan
 1. Zwischenablage-Inhalt einfügen `STRG + V`
 1. unter *sp_control.py* speichern in angezeigter Stelle im Verzeichnisbaum
 
-#### 3.2 config_report.json erstellen
+##### 3.2B config_report.json erstellen
 1. Neue Textatei erstellen
 1. In Texteditor öffnen
 1. Datei-Inhalt einfügen
@@ -97,7 +112,7 @@ Schichtplan
 - Die Werte für **cities** werden im shiftplaner-Tool als default-Werte genutzt, wenn sonst keine Städte angegeben werden
 - Jede Stadt in **cities** *benötigt* eine eigene Zeile in **aliases** nach vorgegebenem Muster 
 
-#### 3.3 Rider_Ersterfassung.xlsx (optional)
+##### 3.3B Rider_Ersterfassung.xlsx (optional)
 Die Datei ist optional und wird nur beim aller ersten Run genutzt. Die Daten werden erfasst, um alle neuen Daten aus dem Schichtplan Datenpaket erweitert und anschließend unter `Rider_Erfassung/Rider_Ersterfassung_\<STADTNAME>.xlsx` gespeichert. 
 
 - xlsx Datei mit bekannten Ridern

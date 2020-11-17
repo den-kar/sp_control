@@ -329,16 +329,6 @@ XLS_REPORT_COND_FMT = (
 # ### INITIAL SETUP ###
 # =================================================================
 # -------------------------------------
-# ### HANDLER FOR KEYBOARD INTERRUPT ###
-# -------------------------------------
-def keyboard_interrupt_handler(signal, frame):
-  print(f'{NL}KeyboardInterrupt (ID: {signal}) has been caught. Cleaning up..')
-  sys.exit(0)
-# -------------------------------------
-signal.signal(signal.SIGINT, keyboard_interrupt_handler)
-# -------------------------------------
-
-# -------------------------------------
 # ### LOAD CONFIGURATION FILE ###
 # -------------------------------------
 if not exists(CONFIG_FP):
@@ -356,6 +346,16 @@ try:
   TESSERACT_AVAILABLE = True
 except pytesseract.TesseractNotFoundError:
   TESSERACT_AVAILABLE = False
+# -------------------------------------
+
+# -------------------------------------
+# ### HANDLER FOR KEYBOARD INTERRUPT ###
+# -------------------------------------
+def keyboard_interrupt_handler(signal, frame):
+  print(f'{NL}KeyboardInterrupt (ID: {signal}) has been caught. Cleaning up..')
+  sys.exit(0)
+# -------------------------------------
+signal.signal(signal.SIGINT, keyboard_interrupt_handler)
 # -------------------------------------
 # =================================================================
 

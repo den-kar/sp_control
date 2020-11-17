@@ -49,16 +49,16 @@ Der Arbeitsordner hat folgende Struktur
 
 ```v
 sp_control-master
-├── Rider_Ersterfassung (wird autom. erstellt)
-│   └── Rider_Ersterfassung_<STADTNAME>.xlsx (je Stadt eine xlsx)
-├── Schichtplan_bearbeitet (wird autom. erstellt)
-│   └── KW<KALENDERWOCHE>_<STADTNAME>_<YYYY_mm_dd_HH_MM_SS>.xlsx (je Report eine xlsx)
-├── Schichtplan_Daten (manuell erstellen)
-│   └── KW<KALENDERWOCHE> (ein Ordner je Schichtplan Datenpaket)
-│       ├── .xlsx files (Schichtplan, Verfügbarkeiten, etc.)
-│       └── .zip files (Verfügbarkeiten Screenshots)
+├── Rider_Ersterfassung       (wird autom. erstellt)
+│   └── Rider_Ersterfassung_<STADTNAME>.xlsx           (je Stadt eine xlsx)
+├── Schichtplan_bearbeitet    (wird autom. erstellt)
+│   └── KW<KALENDERWOCHE>_<STADTNAME>_<DATUMZEIT>.xlsx (je Stadt und KW eine xlsx)
+├── Schichtplan_Daten         (manuell erstellen)
+│   └── KW<KALENDERWOCHE>     (ein Ordner je Schichtplan Datenpaket)
+│       ├── .xlsx files       (Schichtplan, Verfügbarkeiten, Monatsstunden)
+│       └── .zip files        (Verfügbarkeiten Screenshots)
 ├── config_report.json
-├── Rider_Ersterfassung.xlsx (optional)
+├── Rider_Ersterfassung.xlsx  (optional)
 └── sp_control.py
 ```
 

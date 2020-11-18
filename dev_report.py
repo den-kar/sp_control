@@ -486,18 +486,6 @@ def load_avail_xlsx_into_df(df):
 # -------------------------------------
 
 # -------------------------------------
-def load_shift_xlsx_into_df(df):
-  df[SH_DA] = to_datetime(df[SH_DA], format=DMY).dt.date
-  try:
-    df[FR_HO] = to_datetime(df[FR_HO], format=HM).dt.time
-    df[TO_HO] = to_datetime(df[TO_HO], format=HM).dt.time
-  except (TypeError, ValueError):
-    df[FR_HO] = to_datetime(df[FR_HO], format=HMS).dt.time
-    df[TO_HO] = to_datetime(df[TO_HO], format=HMS).dt.time
-  return df.sort_values([DRI, SH_DA, FR_HO], ignore_index=True)
-# -------------------------------------
-
-# -------------------------------------
 def load_ersterkennung_xlsx_into_df(city, ree_dir):
   try:
     df_re = read_excel(join(ree_dir, f'{EE}_{city}.xlsx'))
@@ -509,6 +497,18 @@ def load_ersterkennung_xlsx_into_df(city, ree_dir):
   df_re[FIR_ENT] = to_datetime(df_re[FIR_ENT], format=YMD).dt.date
   df_re[LAS_ENT] = to_datetime(df_re[LAS_ENT], format=YMD).dt.date
   return df_re
+# -------------------------------------
+
+# -------------------------------------
+def load_shift_xlsx_into_df(df):
+  df[SH_DA] = to_datetime(df[SH_DA], format=DMY).dt.date
+  try:
+    df[FR_HO] = to_datetime(df[FR_HO], format=HM).dt.time
+    df[TO_HO] = to_datetime(df[TO_HO], format=HM).dt.time
+  except (TypeError, ValueError):
+    df[FR_HO] = to_datetime(df[FR_HO], format=HMS).dt.time
+    df[TO_HO] = to_datetime(df[TO_HO], format=HMS).dt.time
+  return df.sort_values([DRI, SH_DA, FR_HO], ignore_index=True)
 # -------------------------------------
 
 # -------------------------------------

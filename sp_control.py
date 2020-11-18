@@ -1141,7 +1141,7 @@ def main(start_kw, last_kw, cities, get_avails, merge_pngs, unzip_only):
       dirs = (kw_dir, log_dir, screen_dir, png_dir, ree_dir)
       log += shiftplan_check(
         kw, city, get_avails, merge_pngs, unzip_only, dirs)
-    with open(join(log_dir, LOG_FN), 'w') as logfile:
+    with open(join(log_dir, LOG_FN), 'w', encoding='utf-8') as logfile:
       logfile.write(log)
   log += print_log_header(
     f'TOTAL RUNTIME: {perf_counter() - start:.2f} s', pre='=', suf='=', brk=NL

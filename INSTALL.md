@@ -153,6 +153,10 @@ Werk Student            | 12
 **sp_control** wird von einem Terminal mit eingerichteter und aktivierter Python-Umgebung aus genutzt und bietet durch Eingabe von Parametern zuschaltbare Funktionen.
 
 #### Parameter
+```d
+sp_control.py [-h] --kalenderwoche KALENDERWOCHE [--last_kw LAST_KW] [--cities [CITIES [CITIES ...]]] [--getavails] [--mergeperday] [--unzip_only]
+```
+
 ```v
 Pflichtparameter:
 --kalenderwoche, -k  erste zu bearbeitende Kalenderwoche als Zahl
@@ -176,10 +180,6 @@ Optionale Parameter:
   1. `Anaconda Prompt` eingeben
   1. mit `Enter` bestätigen
   1. zum Datei Verzeichnis navigieren mit `cd <LAUFWERK>:\pfad\zu\sp_control-master`
-
-```d
-sp_control.py [-h] --kalenderwoche KALENDERWOCHE [--last_kw LAST_KW] [--cities [CITIES [CITIES ...]]] [--getavails] [--mergeperday] [--unzip_only]
-```
 
 #### Beispielanwendungen
 

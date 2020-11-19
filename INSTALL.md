@@ -117,35 +117,34 @@ sp_control-master
 - Jede Stadt in **cities** *benötigt* eine eigene Zeile in **aliases** nach vorgegebenem Muster 
 
 ##### 3.3B Rider_Ersterfassung.xlsx (optional)
-Die Datei ist optional und wird nur beim aller ersten Run genutzt. Die Daten werden erfasst, um alle neuen Daten aus dem Schichtplan Datenpaket erweitert und anschließend unter `Rider_Erfassung/Rider_Ersterfassung_\<STADTNAME>.xlsx` gespeichert. 
+Die Datei ist optional und wird nur beim aller ersten Run genutzt. Die Daten werden erfasst, um alle neuen Daten aus dem Schichtplan Datenpaket erweitert und anschließend unter `Rider_Erfassung/Rider_Ersterfassung_<STADTNAME>.xlsx` gespeichert. 
 
 - xlsx Datei mit bekannten Ridern
 - ein Reiter je Stadt
+- first_entry und last_entry Datumsformat: **YYYY-MM-DD**
 
-- Excel Kopfzeile mit Beispiel Eintrag
-
+*Excel Kopfzeile mit Beispiel Eintrag*
 rider name | contract type | min | city | first_entry | last_entry
 -|-|-|-|-|-
 Jane Doe | Minijob | 5 | Offenbach | 2019-06-01 | 2020-11-16
+John W... | ... | ... | ... | ... | ...
 
-  - first_entry und last_entry Datumsformat: **YYYY-MM-DD**
-  - Verwendete wöchtenliche Mindeststunden
-
+*Verwendete wöchtenliche Mindeststunden*
 Vertragsart | Stunden
 -|-
 Foodora_Working Student | 12
-Midijob                 | 12
-Minijob                 |  5
-Minijobber              |  5
-Mini-Jobber             |  5
-TE Midijob              | 12
-TE Minijob              |  5
-TE Teilzeit             | 30
-TE Werkstudent          | 12
-TE WS                   | 12
-Teilzeit                | 30
-Vollzeit                | 30
-Werk Student            | 12
+Midijob | 12
+Minijob | 5
+Minijobber | 5
+Mini-Jobber | 5
+TE Midijob | 12
+TE Minijob | 5
+TE Teilzeit | 30
+TE Werkstudent | 12
+TE WS | 12
+Teilzeit | 30
+Vollzeit | 30
+Werk Student | 12
 
 ---
 ### Anwendung

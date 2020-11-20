@@ -174,13 +174,6 @@ UNASSIGNED_AVAILS_FN = f'unassigned_avails_{START_DT}.json'
 # -------------------------------------
 # ### TUPLES ###
 # -------------------------------------
-CONVERT_COLS_AVAIL = (
-  (ID, 'User ID')
-  , (RID_NAM, USE_NAM)
-  , (CON_TYP, USE_TYP)
-  , (MAX, 'Total Availability')
-  , (AVA, 'Hours Available')
-)
 CONVERT_COLS_MONTH = (
   (WOR, 'Worked hours')
   , (VAC, 'Paid leaves (hours)')
@@ -209,16 +202,9 @@ WEEKDAYS = (
 # -------------------------------------
 # ### DICTS ###
 # -------------------------------------
-ALIAS = {
-  'Frankfurt': {'frankfurt', 'ffm', 'frankfurt am main'}
-  , 'Offenbach': {'offenbach', 'of', 'offenbach am main'}
-  , AVA: ('Verfügbarkeit', 'Verfügbarkeiten')
-  , MON: ('Monatsstunden', 'Stunden')
-  , SHI: ('Schichtplan', 'Schichtplanung')
-}
 COLOR = {
   'black': 0
-  , 'filled_av': 126
+  , 'filled': 126
   , 'name_box': 64
   , 'NP': {222, 228, 238}
   , 'NP 8d': 222
@@ -229,8 +215,7 @@ COLOR = {
   , 'white': 255
 }
 CONTRACT_MIN_H = defaultdict(
-  lambda: 'NO DATA'
-  , {
+  lambda: 'NO DATA', {
     'Foodora_Minijob': 5
     , 'Foodora_Working Student': 12
     , 'Midijob': 12
@@ -334,6 +319,13 @@ XLS_REPORT_COND_FMT = (
 if not exists(CONFIG_FP):
   print(CONFIG_MISSING_MSG)
   DEFAULT_CITIES = ['Frankfurt', 'Offenbach']
+  ALIAS = {
+    'Frankfurt': ('frankfurt', 'ffm', 'frankfurt am main')
+    , 'Offenbach': ('offenbach', 'of', 'offenbach am main')
+    , AVA: ('Verfügbarkeit', 'Verfügbarkeiten')
+    , MON: ('Monatsstunden', 'Stunden')
+    , SHI: ('Schichtplan', 'Schichtplanung')
+  }
 else:
   with open(CONFIG_FP) as file_path:
     config = json.load(file_path)
@@ -428,7 +420,13 @@ def check_w_avails_wo_shift_and_vice_versa(df):
 
 # -------------------------------------
 def get_availability_data(df_row):
-  return {out_col: df_row[in_col] for out_col, in_col in CONVERT_COLS_AVAIL}
+  return {
+  ID: df_row['User ID']
+  , RID_NAM: df_row[USE_NAM]
+  , CON_TYP: df_row[USE_TYP]
+  , MAX: df_row['Total Availability']
+  , AVA: df_row['Hours Available']
+}
 # -------------------------------------
 
 # -------------------------------------
@@ -574,15 +572,11 @@ def parse_stats_msg(counter:defaultdict):
 
 # -------------------------------------
 def png_avail_cell_is_filled(img, top, bot, x_test):
-  return any(
-    img[y_test, x_test] == COLOR['filled_av'] for y_test in (top, bot)
-  )
+  return any(img[y_test, x_test] == COLOR['filled'] for y_test in (top, bot))
 # -------------------------------------
 
 # -------------------------------------
 def png_capture_grid(image):
-  columns = None
-  rows = None
   img_height, img_width = image.shape
   rows, first_x = png_capture_grid_rows(image, img_height)
   rows, columns = png_capture_grid_cols(image, img_width, rows, first_x)
@@ -715,9 +709,9 @@ def png_one_row_get_availabities(img, high, low, columns, col_cnt, date_str):
   in_availablity_block = False
   for col_idx, column in enumerate(columns):
     if png_avail_cell_is_filled(img, high, low, column + 1):
+      hours_block += .5
       if col_idx == 0 and col_cnt == 22:
         extra_hours += .5
-      hours_block += .5
       if not in_availablity_block:
         daily_avail += f'{date_str} | {TIMES[col_cnt][col_idx]}'
         in_availablity_block = True
@@ -902,10 +896,11 @@ def process_screenshots_and_store_avails_in_df(df, kw_dates, dirs, log, *args):
     data, log = png_read_out_screenshot(
       dirs[3], png_cnt, png_n, png, data, log, date_s, day, int(png[-5]), *args
     )
-  log += print_log(parse_stats_msg(data[CNT]), '', BR)
+  log += print_log(parse_stats_msg(data[CNT]), end=BR)
   df_determined = DataFrame(data[DNA], columns=DF_DET_COLUMNS)
   df_determined.to_excel(
     join(dirs[1], f'det_names_{args[0]}_{START_DT}.xlsx')
+    , args[0]
     , columns=DF_DET_COLUMNS
     , index=False
   )
@@ -980,12 +975,12 @@ def rider_ersterfassung_update_names(kw, city, ree_dir, dfs, log):
       log += print_log('-----')
   dfs[EE] = dfs[EE].append(data_list, ignore_index=True)
   dfs[EE].sort_values([LAS_ENT, FIR_ENT, RID_NAM], inplace=True)
-  rider_ersterfassung_style_and_save_xlsx(city, ree_dir, dfs[EE])
+  rider_ersterfassung_format_and_save_xlsx(city, ree_dir, dfs[EE])
   return dfs, log
 # -------------------------------------
 
 # -------------------------------------
-def rider_ersterfassung_style_and_save_xlsx(city, ree_dir, df_min):
+def rider_ersterfassung_format_and_save_xlsx(city, ree_dir, df_min):
   row_cnt = df_min.shape[0] + 1
   writer = ExcelWriter(join(ree_dir, f'{EE}_{city}.xlsx'), engine='xlsxwriter')
   df_min.to_excel(writer, city, index=False, freeze_panes=(1, 0))
@@ -1145,8 +1140,8 @@ def main(start_kw, last_kw, cities, get_avails, merge_pngs, unzip_only):
   for kw in range(start_kw, last_kw + 1):
     kw_dir = join(SPD_DIR, f'KW{kw}')
     if not exists(kw_dir):
-      print(f'##### Couldn`t find "{kw_dir}" ...')
-      return None
+      log += print_log(f'Couldn`t find "{kw_dir}"', '##### ', BR)
+      continue
     log_dir = check_make_dir(kw_dir, 'logs')
     screen_dir = join(kw_dir, 'Screenshots')
     ree_dir = check_make_dir(FILE_DIR, EE)
@@ -1176,7 +1171,6 @@ if __name__ == '__main__':
   parser.add_argument('--getavails', '-a', action='store_true')
   parser.add_argument('--mergeperday', '-m', action='store_true')
   parser.add_argument('--unzip_only', '-z', action='store_true')
-  args = parser.parse_args()
-  main(*args.__dict__.values())
+  main(*parser.parse_args().__dict__.values())
 # -------------------------------------
 # =================================================================

@@ -10,7 +10,7 @@ Vollständige Anleitung [INSTALL.md](https://github.com/den-kar/sp_control/blob/
 ### Anwendung
 
 ```d
-sp_control.py [-h] --kalenderwoche KALENDERWOCHE [--last_kw LAST_KW] [--cities [CITIES [CITIES ...]]] [--getavails] [--mergeperday] [--unzip_only]
+python sp_control.py [-h] --kalenderwoche KALENDERWOCHE [--last_kw LAST_KW] [--cities [CITIES [CITIES ...]]] [--getavails] [--mergeperday] [--unzip_only]
 ```
 
 #### Parameter

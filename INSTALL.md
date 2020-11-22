@@ -45,8 +45,8 @@ In Terminal mit aktivierter Python Umgeben eingeben
 
 ---
 ### 3 Schichtplan Arbeitsordner einrichten
-Der Arbeitsordner hat folgende Struktur 
 
+**Der Arbeitsordner hat folgende Struktur**
 ```v
 sp_control-master
 ├── Rider_Ersterfassung       (wird autom. erstellt)
@@ -62,16 +62,18 @@ sp_control-master
 └── sp_control.py
 ```
 
-#### Weg A - Arbeitsordner aus git-respository erstellen
+#### Arbeitsordern und -dateien erstellen
 
-##### 3.1A **git-repository runterladen**
-  - auf [sp_control Projektseite](https://github.com/den-kar/sp_control) gehen
-  - grünes Feld `Code` anklicken
-  - im neu geöffneten Frame `Download ZIP` anklicken
-  - gezippten Ordner `sp_control-master` in das gewünschte lokale Verzeichnis entpacken
+#### Weg A - aus git-respository
+
+##### 3.1A git-repository runterladen
+  1. auf [sp_control Projektseite](https://github.com/den-kar/sp_control) gehen
+  1. grünes Feld `Code` anklicken
+  1. im neu geöffneten Frame `Download ZIP` anklicken
+  1. gezippten Ordner `sp_control-master` in das gewünschte lokale Verzeichnis entpacken
 
 ##### 3.2A **config_report_muster.json bearbeiten**
-  - Datei an den eigenen Standort anpassen
+  - Datei Inhalt an den eigenen Standort anpassen -> **aliases**, **cities**, ggf. **cmd_path**
   - Datei umbenennen in **config_report.json**
   - Beschreibung unter **3.2B**
 
@@ -151,17 +153,17 @@ Werk Student | 12
 
 **sp_control** wird von einem Terminal mit eingerichteter und aktivierter Python-Umgebung aus genutzt und bietet durch Eingabe von Parametern zuschaltbare Funktionen.
 
-#### Parameter
 ```d
-sp_control.py [-h] --kalenderwoche KALENDERWOCHE [--last_kw LAST_KW] [--cities [CITIES [CITIES ...]]] [--getavails] [--mergeperday] [--unzip_only]
+python sp_control.py [-h] --kalenderwoche KALENDERWOCHE [--last_kw LAST_KW] [--cities [CITIES [CITIES ...]]] [--getavails] [--mergeperday] [--unzip_only]
 ```
 
+#### Parameter
 ```v
 Pflichtparameter:
---kalenderwoche, -k  erste zu bearbeitende Kalenderwoche als Zahl
+--kalenderwoche, -kw  erste zu bearbeitende Kalenderwoche als Zahl
 
 Optionale Parameter:
---last_kw, -lm       letzte zu bearbeitende Kalenderwoche als Zahl
+--last_kw, -l       letzte zu bearbeitende Kalenderwoche als Zahl
 --cities, -c         zu bearbeitende Städte; einzeln aufführen, trennen mit Leerzeichen
 --getavails, -a      Auslesen von Verfügbarkeiten aus Screenshots aktivieren
 --mergeperdaz, -m    Erzeugen zusammengefasster Screenshots je Stadt und Tag

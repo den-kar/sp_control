@@ -119,6 +119,7 @@ NL = '\n'
 NOAV = 'no_avail'
 NOCR = 'no_ocr'
 NODA = 'no_data'
+NOT_IN_MON = ' not in "Monatsstunden": '
 NO_AVAILS = 'keine Verfügbarkeiten'
 NU = 'num'
 NU_FO = 'num_format'
@@ -215,8 +216,7 @@ COLOR = {
   , 'white': 255
 }
 CONTRACT_MIN_H = defaultdict(
-  lambda: 'NO DATA'
-  , {
+  lambda: 'NO DATA', {
     'Foodora_Minijob': 5
     , 'Foodora_Working Student': 12
     , 'Midijob': 12
@@ -323,9 +323,9 @@ if not exists(CONFIG_FP):
   ALIAS = {
     'Frankfurt': ('frankfurt', 'ffm', 'frankfurt am main')
     , 'Offenbach': ('offenbach', 'of', 'offenbach am main')
-    , AVA: ('Verfügbarkeit', 'Verfügbarkeiten')
-    , MON: ('Monatsstunden', 'Stunden')
-    , SHI: ('Schichtplan', 'Schichtplanung')
+    , AVA: ('Verfügbarkeit', 'Verfügbarkeiten', 'Availabilities')
+    , MON: ('Monatsstunden', 'Stunden', 'Working Hours')
+    , SHI: ('Schichtplan', 'Schichtplanung', 'Working Shifts')
   }
 else:
   with open(CONFIG_FP) as file_path:
@@ -369,7 +369,7 @@ def check_data_and_make_comment(rider_data):
   check = ''
   call = ''
   min_available = not isinstance(rider_data[MIN], str)
-  if rider_data[GIV_MAX] > 1:
+  if rider_data[GIV_MAX] > 1 and rider_data[MAX] != 40:
     comment.append(MAX_HOURS)
     call = 'X'
   if rider_data[GIV_AVA] == 10:
@@ -431,40 +431,41 @@ def get_availability_data(df_row):
 # -------------------------------------
 
 # -------------------------------------
-def get_rider_min_hours(df_min, contract, rider_name):
+def get_rider_min_hours(df_ee, riders_ee, data):
   return {
-    MIN: CONTRACT_MIN_H[contract]
-    if 'TE' in contract or rider_name not in df_min[RID_NAM].to_numpy()
-    else df_min[df_min[RID_NAM] == rider_name][MIN].item()
+    MIN: CONTRACT_MIN_H[data[CON_TYP]]
+    if 'TE' in data[CON_TYP] or data[RID_NAM] not in riders_ee
+    else df_ee[df_ee[RID_NAM] == data[RID_NAM]][MIN].item()
   }
 # -------------------------------------
 
 # -------------------------------------
-def get_rider_month_hours(df_month, rider_id):
+def get_rider_month_hours(df_month, data, log):
   rider_data = {}
   if df_month is None:
     for output_col, _ in CONVERT_COLS_MONTH:
       rider_data[output_col] = 'N/A'
     rider_data[PAI_MAX] = 'N/A'
   else:
-    df_h_rider = df_month[df_month[DR_ID] == rider_id]
-    if df_h_rider.shape[0] == 0:
-      print(df_h_rider.shape, rider_id, df_h_rider)
-    for output_col, input_col in CONVERT_COLS_MONTH:
+    df_h_rider = df_month[df_month[DR_ID] == data[ID]]
+    if df_h_rider.empty:
+      log += print_log(NOT_IN_MON + data[RID_NAM], '|MIS|', BR)
+    else:
+      for output_col, input_col in CONVERT_COLS_MONTH:
+        try:
+          rider_data[output_col] = df_h_rider[input_col].item()
+        except ValueError:
+          rider_data[output_col] = 0
+        except KeyError as ex:
+          print(ex)
       try:
-        rider_data[output_col] = df_h_rider[input_col].item()
+        work_ratio = float(str(df_h_rider[WO_RA].item()).strip('%'))
+        if work_ratio > 5: 
+          work_ratio /= 100
       except ValueError:
-        rider_data[output_col] = 0
-      except KeyError as ex:
-        print(ex)
-    try:
-      work_ratio = float(str(df_h_rider[WO_RA].item()).strip('%'))
-      if work_ratio > 5: 
-        work_ratio /= 100
-    except ValueError:
-      work_ratio = 0
-    rider_data[PAI_MAX] = round(work_ratio, 2)
-  return rider_data
+        work_ratio = 0
+      rider_data[PAI_MAX] = round(work_ratio, 2)
+  return rider_data, log
 # -------------------------------------
 
 # -------------------------------------
@@ -527,7 +528,7 @@ def load_xlsx_data_into_dfs(city, dirs, log):
     if not load_xlsx_city_in_filename(city, filename):
       continue
     if fuzz.WRatio(STD_REP, filename) > 86:
-      log += print_log(f' {STD_REP} file available, {filename = }', '|O.O|')
+      log += print_log(f'|O.O| {STD_REP} file available, {filename = }')
       continue
     df = read_excel(join(dirs[0], filename))
     df.rename(columns=lambda x: str(x).strip(), inplace=True)
@@ -548,14 +549,14 @@ def load_xlsx_data_into_dfs(city, dirs, log):
 # -------------------------------------
 
 # -------------------------------------
-def parse_progress_bar(bar_len, prog, pre, suf):
-  done = int(bar_len * prog)
-  return f'{pre} [{"#" * done + "-" * (bar_len - done)}] {prog:.2%} {suf}'
+def parse_break_line(fil='=', text=''):
+  return text.center(80, fil)
 # -------------------------------------
 
 # -------------------------------------
-def parse_break_line(fil='=', text=''):
-  return text.center(80, fil)
+def parse_progress_bar(bar_len, prog, pre, suf):
+  done = int(bar_len * prog)
+  return f'{pre} [{"#" * done + "-" * (bar_len - done)}] {prog:.2%} {suf}'
 # -------------------------------------
 
 # -------------------------------------
@@ -646,11 +647,6 @@ def png_capture_grid_rows(image, img_height, first_x=1, x_search_range=50):
 # -------------------------------------
 
 # -------------------------------------
-def png_get_current_date(day_str, kw_dates:list):
-  return date.fromisoformat(kw_dates[WEEKDAYS.index(day_str)]).strftime(MD)
-# -------------------------------------
-
-# -------------------------------------
 def png_name_determination(rider_names, ocr_name, det_name):
   char_cnt = len(ocr_name)
   if char_cnt >= 5:
@@ -672,30 +668,37 @@ def png_name_determination(rider_names, ocr_name, det_name):
 # -------------------------------------
 
 # -------------------------------------
-def png_ocr_read_frame(top, bot, left, first_col, image):
-  return pytesseract.image_to_string(
-    image[top:bot, left:int(first_col * NAME_SHARE)]
-  ).strip()
+def png_ocr_yield_images(top, bot, left, first_col, images):
+  for image in images:
+    yield pytesseract.image_to_string(
+      image[top:bot, left:int(first_col * NAME_SHARE)]
+    ).strip().split('..', 1)[0]
 # -------------------------------------
 
 # -------------------------------------
 def png_one_row_determine_rider_name(
-  png, img, alt_imgs, row_n, top, bot, left, first_col, rider_names, log
+  png, images, row_n, top, bot, left, first_col, rider_lists, log
 ):
   det_name = []
   ocr_read = []
-  for image in (img, *alt_imgs):
-    ocr_name = png_ocr_read_frame(top, bot, left, first_col, image)
+  for ocr_name in png_ocr_yield_images(top, bot, left, first_col, images):
     if not ocr_name:
       continue
     ocr_read.append(ocr_name)
-    det_name = png_name_determination(rider_names, ocr_name, det_name)
+    det_name = png_name_determination(rider_lists[0], ocr_name, det_name)
     if isinstance(det_name, str) or det_name and max(det_name)[0] >= 73:
       break
   if not det_name:
-    log += print_no_name_determined(png, row_n, ocr_read)
+    ee_name = []
+    for ocr_name in ocr_read:
+      ee_name = png_name_determination(rider_lists[1], ocr_name, ee_name)
+      if isinstance(ee_name, str) or ee_name and max(ee_name)[0] >= 73:
+        break
+    if isinstance(ee_name, list) and ee_name:
+      ee_name = max(ee_name)[1]
+    log += print_no_name_determined(png, row_n, ocr_read, ee_name)
   elif isinstance(det_name, list):
-    if len(det_name) > len(alt_imgs) + 1:
+    if len(det_name) > len(images):
       det_name, log = print_multi_match(png, row_n, det_name, ocr_read, log)
     else:
       det_name = max(det_name)[1]
@@ -744,12 +747,26 @@ def png_one_row_no_data(img, y_up, y_low, x_name, x_avail):
 # -------------------------------------
 
 # -------------------------------------
+def png_parse_availabilities_string(daily_avail, week_h, max_h, stored_avails):
+  return (
+    ''.join(sorted(daily_avail))
+    + f'total: {week_h}h | avail <= {max_h}{NL}'
+    + ('' if week_h <= stored_avails <= max_h else ' ')
+  )
+# -------------------------------------
+
+# -------------------------------------
+def png_parse_date(day_str, kw_dates:list):
+  return date.fromisoformat(kw_dates[WEEKDAYS.index(day_str)]).strftime(MD)
+# -------------------------------------
+
+# -------------------------------------
 def png_read_out_one_row(
-  png, img, alt_imgs, grid_values, row_n, row, next_row, data, log, args
+  png, images, grid_values, row_n, row, next_row, data, log, args
 ):
   columns, col_cnt, first_x, first_col = grid_values
   if png_one_row_no_data(
-    img
+    images[0]
     , y_up=row + 1
     , y_low=next_row - 4
     , x_name=(39 * first_x + first_col) // 40
@@ -757,12 +774,12 @@ def png_read_out_one_row(
   ):
     data[CNT][NODA] += 1
   else:
-    date_str, day, png_idx, city, kw, riders = args
+    date_str, day, png_idx, city, kw, rider_lists = args
     avail_str, daily_h, extra_h = png_one_row_get_availabities(
-      img, row + 1, next_row - 4, columns, col_cnt, date_str
+      images[0], row + 1, next_row - 4, columns, col_cnt, date_str
     )
     rider, ocr_read, log = png_one_row_determine_rider_name(
-      png, img, alt_imgs, row_n, row, next_row, first_x, first_col, riders, log
+      png, images, row_n, row, next_row, first_x, first_col, rider_lists, log
     )
     data[DNA].append(
       (kw, city, day, png_idx, row_n, avail_str[:-1], rider, ocr_read)
@@ -785,17 +802,18 @@ def png_read_out_one_row(
 # -------------------------------------
 def png_read_out_screenshot(png_dir, png_cnt, png_n, png, data, log, *args):
   img = cv.imread(join(png_dir, png), cv.IMREAD_GRAYSCALE)
-  alt_imgs = [
-    cv.filter2D(img, -1, SHARP_KERNEL)
+  images = (
+    img
+    , cv.filter2D(img, -1, SHARP_KERNEL)
     , cv.threshold(img, 212, 255, cv.THRESH_BINARY)[1]
     , cv.threshold(img, 220, 255, cv.THRESH_BINARY)[1]
-  ]
+  )
   rows, row_cnt, grid_values = png_capture_grid(img)
   data[CNT][SCAN] += row_cnt
   for row_n, row in enumerate(rows[:-1], 1):
     print_progress_bar(png_cnt, png_n, row_cnt, row_n, png)
     data, log = png_read_out_one_row(
-      png, img, alt_imgs, grid_values, row_n, row, rows[row_n], data, log, args
+      png, images, grid_values, row_n, row, rows[row_n], data, log, args
     )
   return data, log
 # -------------------------------------
@@ -804,16 +822,14 @@ def png_read_out_screenshot(png_dir, png_cnt, png_n, png, data, log, *args):
 def png_update_report_dataframe(df, data):
   for rider, daily_avail in data[AVA].items():
     rider_df_idx = df[df[RID_NAM] == rider].index[0]
-    week_h = data[HRS][rider]
-    max_h = week_h + data[XTR][rider]
-    df.at[rider_df_idx, AVAILS] = (
-      ''.join(sorted(daily_avail))
-      + f'total: {week_h}h | avail <= {max_h}{NL}'
-      + '' if week_h <= df.at[rider_df_idx, AVA] <= max_h else ' '
+    df.at[rider_df_idx, AVAILS] = png_parse_availabilities_string(
+      daily_avail=daily_avail
+      , week_h=data[HRS][rider]
+      , max_h=data[HRS][rider] + data[XTR][rider]
+      , stored_avails=df.at[rider_df_idx, AVA]
     )
   df.loc[(df[AVA] != 0) & (df[AVAILS] == ''), AVAILS] = ' '
   return df[(df[AVA] != 0) | (df[AVAILS] != '') | (df[GIV_SHI] != '')]
-  
 # -------------------------------------
 
 # -------------------------------------
@@ -834,22 +850,23 @@ def print_log_header(text='', fil='=', pre='-', suf='-', brk=BR):
 # -------------------------------------
 
 # -------------------------------------
-def print_no_name_determined(png, row_n, ocr_read):
-  print('\r', end='')
-  return print_log(
-    f'{NF}{png = }, {row_n = }{" " * 30}'
-    + (f'{NL}|OCR| {ocr_read = }' if ocr_read else '')
-    , '##### ', BR
-  )
-# -------------------------------------
-
-# -------------------------------------
 def print_multi_match(png, row_n, det_name, ocr_read, log):
   log += print_log(f'{MUL_MAT}{png = }, {row_n = }, {ocr_read = }', '[] [] ')
   for similarity, name, ocr, source in det_name:
     log += f'{TAB}{ocr = }, {name = }, {source = }, {similarity = }{NL}'
   det_name = max(det_name)[1]
   return det_name, log + print_log(f' stored at: {det_name}', TAB, BR)
+# -------------------------------------
+
+# -------------------------------------
+def print_no_name_determined(png, row_n, ocr_read, ee_name):
+  print('\r', end='')
+  return print_log(
+    f'##### {NF}{png = }, {row_n = }{" " * 30}'
+    + (f'{NL}|OCR| {ocr_read = }' if ocr_read else '')
+    + (f', {ee_name = }' if ee_name else '')
+    + BR
+  )
 # -------------------------------------
 
 # -------------------------------------
@@ -888,10 +905,10 @@ def process_screenshots_and_store_avails_in_df(df, kw_dates, dirs, log, *args):
   pngs = sorted(listdir(dirs[3]))
   png_cnt = len(pngs)
   for png_n, png in enumerate(pngs):
-    day = png[:-5]
-    date_s = png_get_current_date(day, kw_dates)
+    day, file_suf = png.split('_')
     data, log = png_read_out_screenshot(
-      dirs[3], png_cnt, png_n, png, data, log, date_s, day, int(png[-5]), *args
+      dirs[3], png_cnt, png_n, png, data, log, png_parse_date(day, kw_dates)
+      , day, int(file_suf.split('.')[0]), *args
     )
   log += print_log(parse_stats_msg(data[CNT]), end=BR)
   df_determined = DataFrame(data[DNA], columns=DF_DET_COLUMNS)
@@ -912,24 +929,26 @@ def process_raw_xlsx_data_and_store_in_df(kw, city, dirs, log):
   if dfs is None:
     return None, None, None, log
   dfs, log = rider_ersterfassung_update_names(kw, city, dirs[4], dfs, log)
+  rider_name_lists = dfs[AVA][USE_NAM].to_numpy(), dfs[EE][RID_NAM].to_numpy()
   # ----- store data from mendatory xlsx files in dataframes -----
   kw_dates = set()
   data_list = []
   for _, df_avail_row in dfs[AVA].iterrows():
-    d = {report_column: '' for report_column in REPORT_HEADER}
-    d.update(get_availability_data(df_avail_row))
-    rider_shifts, kw_dates = get_rider_shifts(dfs[SHI], kw_dates, d[ID])
-    d.update(rider_shifts)
-    d.update(calc_given_hour_ratios(d[AVA], d[GIV], d[MAX]))
-    d.update(get_rider_month_hours(dfs[MON], d[ID]))
-    d.update(get_rider_min_hours(dfs[EE], d[CON_TYP], d[RID_NAM]))
-    d.update(check_data_and_make_comment(d))
-    data_list.append(d)
+    data = {report_column: '' for report_column in REPORT_HEADER}
+    data.update(get_availability_data(df_avail_row))
+    rider_shifts, kw_dates = get_rider_shifts(dfs[SHI], kw_dates, data[ID])
+    data.update(rider_shifts)
+    data.update(calc_given_hour_ratios(data[AVA], data[GIV], data[MAX]))
+    rider_month_hour_data, log = get_rider_month_hours(dfs[MON], data, log)
+    data.update(rider_month_hour_data)
+    data.update(get_rider_min_hours(dfs[EE], rider_name_lists[1], data))
+    data.update(check_data_and_make_comment(data))
+    data_list.append(data)
   # ---- create dataframe, extract additional information, filter unneeded rows
   df = DataFrame(data_list)
   log += check_w_avails_wo_shift_and_vice_versa(df)
   # ----------
-  return df, dfs[AVA][USE_NAM].to_numpy(), sorted(kw_dates), log
+  return df, rider_name_lists, sorted(kw_dates), log
 # -------------------------------------
 
 # -------------------------------------
@@ -950,7 +969,7 @@ def rider_ersterfassung_update_names(kw, city, ree_dir, dfs, log):
   data_list = []
   kw_date = date.fromisocalendar(date.today().year, kw, 1)
   names_mon = set() if dfs[MON] is None else {*dfs[MON][DRI]}
-  log += print_log(f'{MH_AVAIL_MSG}{bool(names_mon)}', 'CHECK', BR)
+  log += print_log(f'CHECK {MH_AVAIL_MSG}{bool(names_mon)} {BR}')
   ree_names = dfs[EE][RID_NAM]
   known = {*ree_names}
   names_av = {*dfs[AVA][USE_NAM]}
@@ -963,7 +982,7 @@ def rider_ersterfassung_update_names(kw, city, ree_dir, dfs, log):
       if name in new_names:
         contract = df_q[df_q[name_key] == name][contract_key].item()
         data_list.append(rider_ee_new_entry(city, name, contract, kw_date))
-        log += print_log(f'{name = }, {contract = }', '\t- ')
+        log += print_log(f'{TAB}- {name = }, {contract = }')
       elif name in known:
         rider_ee_idx = dfs[EE][ree_names == name].index[0]
         if kw_date > dfs[EE].at[rider_ee_idx, LAS_ENT]:
@@ -999,7 +1018,7 @@ def rider_ersterfassung_format_and_save_xlsx(city, ree_dir, df_min):
 def save_df_in_formated_xlsx(kw, city, df):
   log = print_log_header(CREATE_XLSX_MSG)
   row_cnt = len(df) + 1
-  #  ----- open instance of xlsx-file -----
+  # ----- open instance of xlsx-file -----
   filename = f'{OUT_FILE_PRE}KW{kw}_{city}-{START_DT}.xlsx'
   writer = ExcelWriter(join(OUTPUT_DIR, filename), engine='xlsxwriter')
   df.to_excel(writer, 'Sheet1', index=False)
@@ -1019,9 +1038,9 @@ def save_df_in_formated_xlsx(kw, city, df):
       f'{cols}{row_cnt}'
       , {**COND_FMT[cond], 'format': fmt_dict[fmt]} if fmt else COND_FMT[cond]
     )
-  # ----- save xlsx-file -----
+  # ----------
   writer.save()
-  return log + print_log(f' saved {filename}', '+++++', BR)
+  return log + print_log(f'+++++ saved {filename}{BR}')
 # -------------------------------------
 
 # -------------------------------------
@@ -1050,32 +1069,30 @@ def shiftplan_check(kw, city, get_avails, merge_pngs, unzip_only, dirs):
 def zip_extract_screenshots(city, dirs, merge_pngs=False):
   log = print_log_header(UNZIP_MSG)
   log += print_log(ZIP_PNG_NAME_CHECK_MSG, '[X|O] ')
-  for zip_file in zip_get_city_files(city, dirs[0]):
+  idx_dict = defaultdict(int)
+  for zip_file in zip_iter_city_files(city, dirs[0]):
     log += print_log(zip_file, TAB)
     with ZipFile(join(dirs[0], zip_file)) as zfile:
-      day = WEEKDAYS[1]
-      idx = 1
       for member in sorted(zfile.namelist()):
         f_name = basename(member)
-        if not f_name:
-          continue
-        f_name, idx, day, log = zip_parse_png_filename(f_name, idx, day, log)
-        source = zfile.open(member)
-        with open(join(dirs[3], f_name), "wb") as target:
-          copyfileobj(source, target)
+        if f_name:
+          f_name, idx_dict, log = zip_parse_png_filename(f_name, idx_dict, log)
+          with open(join(dirs[3], f_name), "wb") as target:
+            copyfileobj(zfile.open(member), target)
     log += print_log('-----')
-  log += print_log(f' saved PNGs in: {dirs[3]}', '+++++', BR)
+  log += print_log(f'+++++ saved PNGs in: {dirs[3]}{BR}')
   if merge_pngs:
     log += zip_merge_png_files_per_day(city, dirs)
   return log
 # -------------------------------------
 
 # -------------------------------------
-def zip_get_city_files(city, kw_dir):
-  return (
-    fn for fn in listdir(kw_dir)
-    if fn.endswith('.zip') and any(ac in fn.casefold() for ac in ALIAS[city])
-  )
+def zip_iter_city_files(city, kw_dir):
+  for filename in listdir(kw_dir):
+    if filename.endswith('.zip'):
+      fn_cf = filename.casefold()
+      if any(fuzz.partial_ratio(alias, fn_cf) > 86 for alias in ALIAS[city]):
+        yield filename
 # -------------------------------------
 
 # -------------------------------------
@@ -1100,27 +1117,26 @@ def zip_merge_png_files_per_day(city, dirs):
       y_offset += img.size[1]
     daily_img_fn = f'{city}_{day}.png'
     new_image.save(join(dirs[2], daily_img_fn))
-    log += print_log(f' saved {daily_img_fn}', '+++++')
+    log += print_log(f'+++++ saved {daily_img_fn}')
   return log + print_log('-----')
 # -------------------------------------
 
 # -------------------------------------
-def zip_parse_png_filename(original, file_idx, last_day, log):
+def zip_parse_png_filename(original, idx_dict, log):
   similarity = 0
   current_day = ''
   for weekday in WEEKDAYS:
-    weekday_similarity = fuzz.partial_ratio(original[:-5], weekday)
+    weekday_similarity = fuzz.partial_ratio(original, weekday)
     if weekday_similarity > similarity:
       similarity = weekday_similarity
       current_day = weekday
-      if weekday_similarity == 100:
+      if similarity > 90:
         break
-  if current_day != last_day:
-    file_idx = 1
-  saved_as = f'{current_day}{file_idx}.png'
+  idx_dict[current_day] += 1
+  saved_as = f'{current_day}_{idx_dict[current_day]}.png'
   if similarity != 100:
-    log += print_log(f'{original = }, {saved_as = }', '\t- ')
-  return saved_as, file_idx + 1, current_day, log
+    log += print_log(f'{TAB}- {original = }, {saved_as = }')
+  return saved_as, idx_dict, log
 # -------------------------------------
 # =================================================================
 
@@ -1136,7 +1152,7 @@ def main(start_kw, last_kw, cities, get_avails, merge_pngs, unzip_only):
   for kw in range(start_kw, last_kw + 1):
     kw_dir = join(SPD_DIR, f'KW{kw}')
     if not exists(kw_dir):
-      log += print_log(f'Couldn`t find "{kw_dir}"', '##### ', BR)
+      log += print_log(f'##### Couldn`t find "{kw_dir}"{BR}')
       continue
     log_dir = check_make_dir(kw_dir, 'logs')
     screen_dir = join(kw_dir, 'Screenshots')

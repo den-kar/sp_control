@@ -6,8 +6,8 @@
   "aliases": {
     "Frankfurt": ["frankfurt", "ffm", "frankfurt am main"],
     "Offenbach": ["offenbach", "of", "offenbach am main"],
-    "avail": ["Verfügbarkeit", "Verfügbarkeiten"],
-    "month": ["Monatsstunden", "Stunden"],
-    "shift": ["Schichtplan", "Schichtplanung"]
+    "avail": ["Verfügbarkeit", "Verfügbarkeiten", "Availabilities"],
+    "month": ["Monatsstunden", "Stunden", "Working Hours"],
+    "shift": ["Schichtplan", "Schichtplanung", "Working Shifts"]
   }
 }

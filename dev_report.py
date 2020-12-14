@@ -9,7 +9,7 @@ import json
 from operator import ne, eq
 from os import get_terminal_size, listdir, makedirs
 from os.path import abspath, basename, dirname, exists, join
-from shutil import copyfileobj
+import shutil
 import signal
 import sys
 from time import perf_counter
@@ -86,6 +86,7 @@ GIV_SHI = 'given shifts'
 HRS = 'hours'
 ID = 'ID'
 INITIAL_MSG = f'SHIFTPLAN CHECK {START_DT}'
+JPG_NAME_CHECK_MSG = 'Check available JPG file names'
 LAS_ENT = 'last_entry'
 LEF = 'left'
 LINK = 'linked'
@@ -118,6 +119,7 @@ NU = 'num'
 NU_FO = 'num_format'
 PAI = 'paid'
 PAI_MAX = 'paid/max'
+PROCESS_JPG_MSG = ' PROCESS JPGS IN WORKING DIRECTORY '
 PROCESS_PNG_MSG = ' SCAN AVAILABILITES FROM PNGS '
 PROCESS_XLSX_MSG = ' PROCESS RAW XLSX DATA '
 REDUCE_HOURS = ' -> auf Min.Std. reduzieren'
@@ -126,7 +128,7 @@ SHI = 'shift'
 SCAN = 'scanned'
 SIC = 'sick'
 SH_DA = 'Shift Date'
-STD_REP = 'Stundenreports'
+STD_REP = 'stundenreports'
 SYNCH_MIN_H_MSG = ' SYNCHRONIZE NAMES IN MINDESTSTUNDEN LIST '
 TAB = '\t'
 TOP = 'top'
@@ -404,12 +406,21 @@ def check_make_dir(*args):
 # -------------------------------------
 
 # -------------------------------------
-def city_in_xlsx_filename(filename, city):
+def city_is_in_xlsx_filename(filename, city):
   return (
     filename.endswith('xlsx')
     and filename[0].isalpha()
+    and 'wochenstunden' not in filename.casefold()
     and any(fuzz.partial_ratio(alias, filename) > 86 for alias in ALIAS[city])
   )
+# -------------------------------------
+
+# -------------------------------------
+def daily_screenshot_list(day, png_dir):
+  return [
+    Image.open(join(png_dir, day_fn))
+    for day_fn in sorted(fn for fn in listdir(png_dir) if day in fn)
+  ]
 # -------------------------------------
 
 # -------------------------------------
@@ -550,9 +561,11 @@ def load_xlsx_data_into_dfs(dirs, city, log):
   missing_files = [ALIAS[AVA][0], ALIAS[SHI][0]]
   dfs = {MON: None}
   for filename in listdir(dirs[0]):
-    if not city_in_xlsx_filename(filename, city):
+  # for filename in map(lambda x: x.casefold(), listdir(dirs[0])):
+    fn_cf = filename.casefold()
+    if not city_is_in_xlsx_filename(fn_cf, city):
       continue
-    if fuzz.WRatio(STD_REP, filename) > 86:
+    if fuzz.WRatio(STD_REP, fn_cf) > 86:
       log += print_log(f'|O.O| {STD_REP} file available, {filename = }')
       continue
     df = read_excel(join(dirs[0], filename))
@@ -580,6 +593,23 @@ def log_multi_match(name_data, ocr_read, row_n, png, log):
     log += f'{TAB}{ocr = }, {name = }, {source = }, {similarity = }{NL}'
   det_name = max(name_data)[1]
   return det_name, log + f'{TAB} stored at: {det_name}{BR}'
+# -------------------------------------
+
+# -------------------------------------
+def merge_daily_screenshots(city, dirs):
+  log = print_log_header(MERGE_FILES_MSG)
+  for day in WEEKDAYS:
+    images = daily_screenshot_list(day, dirs[3])
+    widths, heights = zip(*(img.size for img in images))
+    new_image = Image.new('RGB', (max(widths), sum(heights)))
+    y_offset = 0
+    for img in images:
+      new_image.paste(img, (0, y_offset))
+      y_offset += img.size[1]
+    daily_img_fn = f'{city}_{day}.png'
+    new_image.save(join(dirs[2], daily_img_fn))
+    log += print_log(f'+++++ saved {daily_img_fn}')
+  return log + print_log('-----')
 # -------------------------------------
 
 # -------------------------------------
@@ -1152,7 +1182,10 @@ def save_df_in_formated_xlsx(kw, city, df):
 def shiftplan_check(city, kw, dirs, get_avails, merge_pngs, unzip_only):
   start = perf_counter()
   log = print_log_header(CITY_LOG_PRE + city, pre='=')
-  log += zip_extract_screenshots(city, dirs, merge_pngs)
+  log += tidy_jpg_files(city, dirs, merge_pngs)
+  log += unzip_screenshots(city, dirs, merge_pngs)
+  # log += tidy_raw_files(city, dirs, merge_pngs)
+  # log += unzip_screenshots(city, dirs, merge_pngs)
   if unzip_only:
     return log
   df, name_lists, dates, log = process_raw_xlsx_data_store_in_df(
@@ -1171,62 +1204,35 @@ def shiftplan_check(city, kw, dirs, get_avails, merge_pngs, unzip_only):
 # -------------------------------------
 
 # -------------------------------------
-def zip_extract_screenshots(city, dirs, merge_pngs=False):
-  log = print_log_header(UNZIP_MSG)
-  log += print_log(ZIP_PNG_NAME_CHECK_MSG, '[X|O] ')
+def tidy_jpg_files(city, dirs, merge_pngs):
+  jpg_files = [fn for fn in listdir(dirs[0]) if fn.endswith('.jpg')]
+  if not jpg_files:
+    return ''
+  log = print_log_header(PROCESS_JPG_MSG)
+  log += print_log(JPG_NAME_CHECK_MSG, '|JPG| ')
   idx_dict = defaultdict(int)
-  for zip_file in zip_iter_city_files(city, dirs[0]):
-    log += print_log(zip_file, TAB)
-    with ZipFile(join(dirs[0], zip_file)) as zfile:
-      for member in sorted(zfile.namelist()):
-        f_name = basename(member)
-        if f_name:
-          f_name, idx_dict, log = zip_parse_png_filename(f_name, idx_dict, log)
-          with open(join(dirs[3], f_name), "wb") as target:
-            copyfileobj(zfile.open(member), target)
-    log += print_log('-----')
+  raw_dir = check_make_dir(dirs[2], 'raw')
+  vac_dir = check_make_dir(raw_dir, 'Urlaub')
+  for fn in sorted(jpg_files):
+    fn_cf = fn.casefold()
+    if not any(fuzz.WRatio(alias, fn_cf) > 86 for alias in ALIAS[city]):
+      continue
+    source = join(dirs[0], fn)
+    if 'urlaub' in fn.casefold():
+      target = join(vac_dir, fn)
+    else:
+      target = join(raw_dir, fn)
+      proc_fn, idx_dict, log = tidy_screenshot_filename(fn, idx_dict, log)
+      Image.open(source).save(join(dirs[3], proc_fn))
+    shutil.move(source, target)
   log += print_log(f'+++++ saved PNGs in: {dirs[3]}{BR}')
   if merge_pngs:
-    log += zip_merge_png_files_per_day(city, dirs)
+    log += merge_daily_screenshots(city, dirs)
   return log
 # -------------------------------------
 
 # -------------------------------------
-def zip_iter_city_files(city, kw_dir):
-  for filename in listdir(kw_dir):
-    if filename.endswith('.zip'):
-      fn_cf = filename.casefold()
-      if any(fuzz.partial_ratio(alias, fn_cf) > 86 for alias in ALIAS[city]):
-        yield filename
-# -------------------------------------
-
-# -------------------------------------
-def zip_merge_get_daily_files(day, png_dir):
-  return [
-      Image.open(join(png_dir, day_fn))
-      for day_fn in sorted(fn for fn in listdir(png_dir) if day in fn)
-    ]
-# -------------------------------------
-
-# -------------------------------------
-def zip_merge_png_files_per_day(city, dirs):
-  log = print_log_header(MERGE_FILES_MSG)
-  for day in WEEKDAYS:
-    images = zip_merge_get_daily_files(day, dirs[3])
-    widths, heights = zip(*(img.size for img in images))
-    new_image = Image.new('RGB', (max(widths), sum(heights)))
-    y_offset = 0
-    for img in images:
-      new_image.paste(img, (0, y_offset))
-      y_offset += img.size[1]
-    daily_img_fn = f'{city}_{day}.png'
-    new_image.save(join(dirs[2], daily_img_fn))
-    log += print_log(f'+++++ saved {daily_img_fn}')
-  return log + print_log('-----')
-# -------------------------------------
-
-# -------------------------------------
-def zip_parse_png_filename(original, idx_dict, log):
+def tidy_screenshot_filename(original, idx_dict, log):
   similarity = 0
   current_day = ''
   for weekday in WEEKDAYS:
@@ -1250,6 +1256,43 @@ def zip_parse_png_filename(original, idx_dict, log):
     log += print_log(f'{TAB}- {original = }, {saved_as = }')
   return saved_as, idx_dict, log
 # -------------------------------------
+
+# -------------------------------------
+def unzip_screenshots(city, dirs, merge_pngs=False):
+  log = print_log_header(UNZIP_MSG)
+  log += print_log(ZIP_PNG_NAME_CHECK_MSG, '[X|O] ')
+  idx_dict = defaultdict(int)
+  # for zip_file in zip_iter_city_files(city, dirs[0]):
+  for zip_file in listdir(dirs[0]):
+    if not zip_file.endswith('.zip'):
+      continue
+    fn_cf = zip_file.casefold()
+    if any(fuzz.partial_ratio(alias, fn_cf) > 86 for alias in ALIAS[city]):
+      log += print_log(zip_file, TAB)
+      with ZipFile(join(dirs[0], zip_file)) as zfile:
+        for member in sorted(zfile.namelist()):
+          f_name = basename(member)
+          if not f_name:
+            continue
+          f_name, idx_dict, log = tidy_screenshot_filename(f_name, idx_dict, log)
+          with open(join(dirs[3], f_name), "wb") as target:
+            shutil.copyfileobj(zfile.open(member), target)
+      log += print_log('-----')
+  log += print_log(f'+++++ saved PNGs in: {dirs[3]}{BR}')
+  if merge_pngs:
+    log += merge_daily_screenshots(city, dirs)
+  return log
+# -------------------------------------
+
+# # -------------------------------------
+# def zip_iter_city_files(city, kw_dir):
+#   for filename in listdir(kw_dir):
+#     if not filename.endswith('.zip'):
+#       continue
+#     fn_cf = filename.casefold()
+#     if any(fuzz.partial_ratio(alias, fn_cf) > 86 for alias in ALIAS[city]):
+#       yield filename
+# # -------------------------------------
 # =================================================================
 
 # =================================================================

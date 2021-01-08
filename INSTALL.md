@@ -41,23 +41,24 @@ Wenn im Terminal die aktive Zeile mit `(Takeaway)` anfängt, ist die Umgebung ak
 
 #### 2.2 site-packages installieren
 In Terminal mit aktivierter Python Umgeben eingeben
-> conda install -c conda-forge pandas pillow xlrd xlsxwriter opencv fuzzywuzzy pytesseract -y
+> conda install -c conda-forge pandas pillow xlrd xlsxwriter opencv fuzzywuzzy pytesseract msoffcrypto -y
 
 ---
 ### 3 Schichtplan Arbeitsordner einrichten
 
 **Der Arbeitsordner hat folgende Struktur**
-```v
+```md
 sp_control-master
 ├── Rider_Ersterfassung       (wird autom. erstellt)
 │   └── Rider_Ersterfassung_<STADTNAME>.xlsx           (je Stadt eine xlsx)
 ├── Schichtplan_bearbeitet    (wird autom. erstellt)
 │   └── KW<KALENDERWOCHE>_<STADTNAME>_<DATUMZEIT>.xlsx (je Stadt und KW eine xlsx)
 ├── Schichtplan_Daten         (manuell erstellen)
-│   └── KW<KALENDERWOCHE>     (ein Ordner je Schichtplan Datenpaket)
-│       ├── .xlsx files       (Schichtplan, Verfügbarkeiten, Monatsstunden)
-│       └── .zip files        (Verfügbarkeiten Screenshots)
-├── config_report.json
+│   └── <JAHR>                (Ordner, Name ist 4-stellige Jahreszahl)
+│       └── KW<KALENDERWOCHE> (ein Ordner je Schichtplan Datenpaket)
+│           ├── .xlsx files   (Schichtplan, Verfügbarkeiten, Monatsstunden)
+│           └── .zip files    (Verfügbarkeiten Screenshots)
+├── config_report.json        (unter Linux optional, unter Windows "cmd_path" Parameter ausfüllen)
 ├── Rider_Ersterfassung.xlsx  (optional)
 └── sp_control.py
 ```
@@ -95,19 +96,22 @@ sp_control-master
 1. Neue Textatei erstellen
 1. In Texteditor öffnen
 1. Datei-Inhalt einfügen
-```yaml
+```json
 {
-    "tesseract": {
-        "cmd_path": "C:\\Tesseract-OCR\\tesseract.exe"
-    }
-    "cities": ["Frankfurt", "Offenbach"],
-    "aliases": {
-        "Frankfurt": ["frankfurt", "ffm", "frankfurt am main"],
-        "Offenbach": ["offenbach", "of", "offenbach am main"],
-        "avail": ["Verfügbarket", "Verfügbarkeiten"],
-        "month": ["Monatsstunden", "Stunden"],
-        "shift": ["Schichtplan", "Schichtplanung"]
-    }
+  "tesseract": {
+    "cmd_path": "C:\\Tesseract-ocr\\tesseract.exe"
+  },
+  "cities": ["Frankfurt", "Offenbach"],
+  "password": "",
+  "aliases": {
+    "Frankfurt": ["frankfurt", "ffm", "frankfurt am main"],
+    "Offenbach": ["offenbach", "of", "offenbach am main"],
+    "Fürth": ["fürth", "fuerth"],
+    "Nürnberg": ["nuernberg", "nuremberg", "nue"],
+    "avail": ["verfügbarkeit", "availabilities", "verfuegbarkeiten"],
+    "month": ["monatsstunden", "stunden", "hours", "hour report", "working hours"],
+    "shift": ["schichtplan", "schichtplanung", "working shifts", "planung", "shift report"]
+  }
 }
 ```
 4. unter *config_report.json* speichern in angezeigter Stelle im Verzeichnisbaum
@@ -126,10 +130,10 @@ Die Datei ist optional und wird nur beim aller ersten Run genutzt. Die Daten wer
 - first_entry und last_entry Datumsformat: **YYYY-MM-DD**
 
 *Excel Kopfzeile mit Beispiel Eintrag*
-rider name | contract type | min | city | first_entry | last_entry
--|-|-|-|-|-
+rider name | contract type | min | city | first_entry | last_entry | current contract first entry | prev contracts | similar names
+-|-|-|-|-|-|-|-|-
 Jane Doe | Minijob | 5 | Offenbach | 2019-06-01 | 2020-11-16
-John W... | ... | ... | ... | ... | ...
+John Wayne | ... | ... | ... | ... | ...
 
 *Verwendete wöchtenliche Mindeststunden*
 Vertragsart | Stunden
@@ -153,21 +157,26 @@ Werk Student | 12
 
 **sp_control** wird von einem Terminal mit eingerichteter und aktivierter Python-Umgebung aus genutzt und bietet durch Eingabe von Parametern zuschaltbare Funktionen.
 
-```d
-python sp_control.py [-h] --kalenderwoche KALENDERWOCHE [--last_kw LAST_KW] [--cities [CITIES [CITIES ...]]] [--getavails] [--mergeperday] [--unzip_only]
+```md
+usage: sp_control.py [-h] [-y YEAR] [-kw KALENDERWOCHE] [-lkw LAST_KW] [-c [CITIES [CITIES ...]]] [-a] [-to] [-m] [-eeo]
 ```
 
 #### Parameter
-```v
-Pflichtparameter:
---kalenderwoche, -kw  erste zu bearbeitende Kalenderwoche als Zahl
-
-Optionale Parameter:
---last_kw, -l       letzte zu bearbeitende Kalenderwoche als Zahl
---cities, -c         zu bearbeitende Städte; einzeln aufführen, trennen mit Leerzeichen
---getavails, -a      Auslesen von Verfügbarkeiten aus Screenshots aktivieren
---mergeperdaz, -m    Erzeugen zusammengefasster Screenshots je Stadt und Tag
---unzip_only, -z     zip Dateien mit Screenshots entpacken und shiftplaner beenden
+```md
+optional arguments:
+  -h, --help            show this help message and exit
+  -y YEAR, --year YEAR  Jahr der zu prüfenden Daten, default: heutiges Jahr
+  -kw KALENDERWOCHE, --kalenderwoche KALENDERWOCHE
+                        Kalenderwoche der zu prüfenden Daten, default: 1
+  -lkw LAST_KW, --last_kw LAST_KW
+                        Letzte zu bearbeitende Kalenderwoche als Zahl
+  -c [CITIES [CITIES ...]], --cities [CITIES [CITIES ...]]
+                        Zu prüfende Stadt oder Städte, Stadtnamen trennen mit einem Leerzeichen, default: [Frankfurt Offenbach]
+  -a, --get_avail       Aktiviert das Auslesen mitgeschickter Screenshots
+  -to, --tidy_only      Räumt alle Verfügbarkeiten Screenshot Dateien auf
+  -m, --mergeperday     Erstellt je Stadt und Tag eine zusammegesetzte Verfügbarkeiten-Screenshot-Datei
+  -eeo, --ersterkennung_only
+                        Erstellt nur die Rider_Ersterkennung Datei, ohne SP-Report
 ```
 
 #### Terminal mit Python Umgebung öffnen und zum Arbeitsorder navigieren
@@ -185,9 +194,9 @@ Optionale Parameter:
 #### Beispielanwendungen
 
 **Kompletter Report `KW<KALENDERWOCHE>_<STADTNAME><YYYY_mm_dd_HH_MM_SS>.xlsx`**
-  - Kalenderwoche 47, default Städte, Verfügbarkeiten auslesen
-> sp_control.py -kw 47 -a
+  - Jahr 2020, Kalenderwoche 47, default Städte, Verfügbarkeiten auslesen
+> sp_control.py -y 2020 -kw 47 -a
 
 **Erstellung vollständiger `Rider_Ersterfassung_<STADTNAME>.xlsx` Datei**
-  - ab KW 1, bis KW 47, nur Frankfurt, ohne auslesen der Verfügbarkeiten
-> sp_control.py -kw 1 -l 47 -c Frankfurt
+  - ab KW 1, bis KW 53, nur Frankfurt, speichert nur Ersterfassung Datei -> keine Schichtplan-Reports, ohne auslesen der Verfügbarkeiten
+> sp_control.py -kw 1 -lkw 53 -c Frankfurt -eeo

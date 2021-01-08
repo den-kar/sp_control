@@ -3,11 +3,14 @@
     "cmd_path": "C:\\Tesseract-ocr\\tesseract.exe"
   },
   "cities": ["Frankfurt", "Offenbach"],
+  "password": "",
   "aliases": {
     "Frankfurt": ["frankfurt", "ffm", "frankfurt am main"],
     "Offenbach": ["offenbach", "of", "offenbach am main"],
-    "avail": ["Verfügbarkeit", "Verfügbarkeiten", "Availabilities"],
-    "month": ["Monatsstunden", "Stunden", "Working Hours"],
-    "shift": ["Schichtplan", "Schichtplanung", "Working Shifts"]
+    "Fürth": ["fürth", "fuerth"],
+    "Nürnberg": ["nuernberg", "nuremberg", "nue"],
+    "avail": ["verfügbarkeit", "availabilities", "verfuegbarkeiten"],
+    "month": ["monatsstunden", "stunden", "hours", "hour report", "working hours"],
+    "shift": ["schichtplan", "schichtplanung", "working shifts", "planung", "shift report"]
   }
 }

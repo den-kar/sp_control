@@ -41,8 +41,10 @@ Wenn im Terminal die aktive Zeile mit `(Takeaway)` anfängt, ist die Umgebung ak
 
 #### 2.2 site-packages installieren
 In Terminal mit aktivierter Python Umgeben eingeben
-> conda install -c conda-forge pandas pillow xlrd xlsxwriter opencv fuzzywuzzy pytesseract msoffcrypto -y
+> conda install -c conda-forge pandas pillow xlrd xlsxwriter opencv fuzzywuzzy pytesseract -y
 
+Anschließend im selben Terminal eingeben
+> pip install msoffcrypto-tool
 ---
 ### 3 Schichtplan Arbeitsordner einrichten
 

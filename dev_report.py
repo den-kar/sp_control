@@ -967,7 +967,7 @@ def png_grid_remove_invalid_rows(rows, x, img):
         print(f'all white {row_n=}, {x=}, {top=}, {bot=}')
   for del_row in del_rows:
     del rows[del_row]
-  if DEV >= 1:
+  if DEV == 1:
     print(f'Remove invalid rows:    {del_rows[::-1]}')
   return rows, len(rows) - 1
 # -------------------------------------
@@ -1219,11 +1219,11 @@ def png_values_cv_data(rows, row_cnt, left, first_col, img):
   return {
     BAD_RESO: row_height < 21
     , IMG_VARIATIONS: img_variations
-    , RE_MA: int(resize_factor * png_calc_margin(rows, row_height))
+    , RE_MA: int(resize_factor * png_values_get_margin(rows, row_height))
     , RE_ROW: [int(resize_factor * row) for row in rows]
     , RI: right
     , ROI: {'orig': [0, 0, left, right], 'resize': [0, 0, 0, res_width]}
-    , VALID: png_calc_min_valid_perc(row_height)
+    , VALID: png_values_get_min_valid_perc(row_height)
   }
 # -------------------------------------
 

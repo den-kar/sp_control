@@ -442,6 +442,8 @@ if not exists(CONFIG_FP):
   DEF_CITY = ['Frankfurt', 'Offenbach']
   ALIAS = {
     'Frankfurt': ('frankfurt', 'ffm', 'frankfurt am main')
+    , 'Fürth': ['fürth', 'fuerth']
+    , 'Nürnberg': ['nuernberg', 'nuremberg', 'nue']
     , 'Offenbach': ('offenbach', 'of', 'offenbach am main')
     , AVA: ('Verfügbarkeit', 'Verfügbarkeiten', 'Availabilities')
     , MON: ('Monatsstunden', 'Stunden', 'Working Hours')
@@ -510,7 +512,7 @@ def get_base_data(name, df_row, source, df_ava):
     data.update(get_max_hours(data[CON_TYP], df_row))
   else:
     data.update(get_base_data_from_mon(name, df_row))
-    data.update(get_contract_and_av_h(name, df_row, df_ava))
+    data.update(get_contract_and_avail_h(name, df_row, df_ava))
     data.update(get_max_hours(data[CON_TYP], df_ava, name))
   return data
 # -------------------------------------
@@ -554,7 +556,7 @@ def get_base_data_from_mon(name, df_row):
 # -------------------------------------
 
 # -------------------------------------
-def get_contract_and_av_h(name, df_row, df_ava):
+def get_contract_and_avail_h(name, df_row, df_ava):
   try:
     ava_row = df_ava.loc[name]
   except KeyError:
@@ -747,8 +749,8 @@ def load_shift_xlsx_into_df(df):
 
 # -------------------------------------
 def load_xlsx_data_into_dfs(dirs, city, log):
-  mendatory = [ALIAS[AVA][0], ALIAS[SHI][0]]
   dfs = {MON: None, LOG: log}
+  mendatory = [ALIAS[AVA][0], ALIAS[SHI][0]]
   for filename in listdir(dirs[0]):
     fn_cf = filename.casefold().replace('_', ' ').replace('-', ' ')
     if invalid_city_xlsx_filename(fn_cf, city):
@@ -781,14 +783,14 @@ def load_xlsx_data_into_dfs(dirs, city, log):
 
 # -------------------------------------
 def parse_availability_string(avails, week, extra, h_by_shifts=0):
-  total = week + extra
+  max_h = week + extra
   if isinstance(h_by_shifts, str):
     suf = NOT_IN_AV
-  elif week <= h_by_shifts <= total:
+  elif week <= h_by_shifts <= max_h:
     suf = ''
   else:
     suf = ' '
-  return f'{"".join(sorted(avails))}total: {week}h | avail <= {total}{NL}{suf}'
+  return f'{"".join(sorted(avails))}total: {week}h | avail <= {max_h}{NL}{suf}'
 # -------------------------------------
 
 # -------------------------------------
@@ -829,68 +831,14 @@ def parse_sp_check_msg(city, year, kw):
 # -------------------------------------
 
 # -------------------------------------
-def parse_stats_msg(counter:defaultdict):
+def parse_stats_msg(counter):
   return (
-    f'| S | total scanned        : {counter[SCAN]:3d}{NL}'
-    f'| T | not readable         : {counter[NOCR]:3d}{NL}'
-    f'| A | rows without data    : {counter[NODA]:3d}{NL}'
-    f'| T | no availabilites     : {counter[NOAV]:3d}{NL}'
-    f'| S | duplicate data       : {counter[DUPL]:3d}{NL}'
-    f'<===> linked availabilites : {counter[LINK]:3d}'
+    f'| S | total rows count     : {counter[SCAN]:4d}{NL}'
+    f'| T | duplicate rows       : {counter[DUPL]:4d}{NL}'
+    f'| A | linked rows          : {counter[LINK]:4d}{NL}'
+    f'| T | no availabilites     : {counter[NOAV]:4d}{NL}'
+    f'| S | not readable         : {counter[NOCR]:4d}'
   )
-# -------------------------------------
-
-# -------------------------------------
-def png_cv_data(rows, row_cnt, left, first_col, img):
-  mid_row_n = row_cnt // 2
-  row_height = rows[mid_row_n + 1] - rows[mid_row_n]
-  resize_factor = 109 / row_height
-  margin = 0 if rows[-1] - rows[-2] < row_height * 2 // 3 else 3
-  right = int(.29 * first_col)
-  res_width = int(resize_factor * right)
-  res_height = int(resize_factor * img.shape[0])
-  if DEV == 1:
-    print(
-      f'{mid_row_n=}, {img.shape=}, {row_height=}, {resize_factor=}, '
-      f'{right=}, {res_width=}, {res_height=}'
-    )
-  res_img = cv.resize(img[:, left:right], (res_width, res_height))
-  img_variations = (
-    (cv.threshold(res_img, 220, 255, cv.THRESH_BINARY)[1], 'resize')
-    , (CLAHE_DEF.apply(res_img), 'resize')
-    , (cv.threshold(res_img, 212, 255, cv.THRESH_BINARY)[1], 'resize')
-    , (cv.filter2D(res_img, -1, KERNEL_SHARP), 'resize')
-    , (CLAHE_L3_S7.apply(res_img), 'resize')
-  )
-  if EIV:
-    img_variations += (
-      (cv.threshold(res_img, 225, 255, cv.THRESH_BINARY)[1], 'resize')
-      , (cv.threshold(res_img, 205, 255, cv.THRESH_BINARY)[1], 'resize')
-      , (res_img, 'resize')
-      , (CLAHE_L4_S7.apply(res_img), 'resize')
-      , (img, 'orig')
-      , (CLAHE_L2_S6.apply(res_img), 'resize')
-      , (cv.threshold(
-        cv.filter2D(res_img, -1, KERNEL_ALT), 212, 255, cv.THRESH_BINARY)[1]
-        , 'resize'
-      )
-      , (cv.threshold(img, 220, 255, cv.THRESH_BINARY)[1], 'orig')
-    )
-  if row_height < 19:
-    min_valid_perc = 33
-  elif row_height > 65:
-    min_valid_perc = 66
-  else:
-    min_valid_perc = row_height * 11 / 6
-  return {
-    BAD_RESO: row_height < 21
-    , IMG_VARIATIONS: img_variations
-    , RE_MA: int(resize_factor * margin)
-    , RE_ROW: [int(resize_factor * row) for row in rows]
-    , RI: right
-    , ROI: {'orig': [0, 0, left, right], 'resize': [0, 0, 0, res_width]}
-    , VALID: min_valid_perc
-  }
 # -------------------------------------
 
 # -------------------------------------
@@ -979,11 +927,11 @@ def png_grid_capture_rows(img):
   if DEV == 1:
     print(f'Capture raw row values: {rows[::-1]}')
     print(f'{img.shape=}')
-  return png_grid_check_bot_row_and_invert(rows), left
+  return png_grid_check_bot_row_and_reverse(rows), left
 # -------------------------------------
 
 # -------------------------------------
-def png_grid_check_bot_row_and_invert(rows):
+def png_grid_check_bot_row_and_reverse(rows):
   raw_row_cnt = len(rows)
   if raw_row_cnt >= 2:
     mid_row_n = raw_row_cnt // 2
@@ -1025,6 +973,17 @@ def png_grid_remove_invalid_rows(rows, x, img):
 # -------------------------------------
 
 # -------------------------------------
+def png_image_variations_yield_ocr_name(cv_data):
+  for idx, (image, size_key) in enumerate(cv_data[IMG_VARIATIONS], 1):
+    top, bot, left, right = cv_data[ROI][size_key]
+    ocr = image_to_string(image[top:bot,left:right], config='--psm 7').strip()
+    if cv_data[NP]:
+      for split_chars in SPLIT_CHARS:
+        ocr = ocr.rsplit(split_chars, maxsplit=1)[0]
+    yield idx, ocr.strip(STRIP_CHARS)
+# -------------------------------------
+
+# -------------------------------------
 def png_name_determination(ref_data, cv_data):
   hit = ''
   img_n = 0
@@ -1033,7 +992,7 @@ def png_name_determination(ref_data, cv_data):
   readable_img_cnt = 0
   scores = defaultdict(int)
   score_by_ocr = {}
-  for img_n, ocr_name in png_ocr_yield_name_from_image_variations(cv_data):
+  for img_n, ocr_name in png_image_variations_yield_ocr_name(cv_data):
     if ocr_name:
       readable_img_cnt += 1
     if len(ocr_name) < 6:
@@ -1044,6 +1003,8 @@ def png_name_determination(ref_data, cv_data):
     except KeyError:
       hit, scores, img_score = png_name_main_algo(ocr_name, scores, ref_data)
       if hit:
+        if hit in ref_data[2]:
+          hit = png_name_similarity_check(hit, ocr_name, ref_data[2][hit])
         if DEV == 2:
           print(f'det algo=main, {img_n=} | {png_name_sorted_scores(scores)}')
         return hit, ocr_read
@@ -1075,30 +1036,12 @@ def png_name_fallback_algo(ocr_read):
 # -------------------------------------
 
 # -------------------------------------
-def png_name_score_check(scores, img_n, min_total_perc, leading_factor=1.35):
-  if scores and img_n:
-    msn, *rest = png_name_sorted_scores(scores)
-    valid_score = img_n * 2 * min_total_perc
-    if len(scores) > 1:
-      valid_score = max(leading_factor * rest[0][1], valid_score)
-    if msn[1] >= valid_score:
-      return msn[0]
-  return ''
-# -------------------------------------
-
-# -------------------------------------
-def png_name_sorted_scores(scores, result_cnt=5):
-  return sorted(scores.items(), key=lambda x: x[1], reverse=True)[:result_cnt]
-# -------------------------------------
-
-# -------------------------------------
 def png_name_main_algo(ocr_name, scores, ref_data):
   char_cnt = len(ocr_name)
   hit = ''
-  idx = 0
   img_score = defaultdict(int)
   query = ''
-  for idx, name in enumerate(ref_data[0]):
+  for name in ref_data[0]:
     query = name[:char_cnt]
     slice_similarity = fuzz.WRatio(ocr_name, query)
     if slice_similarity >= 89:
@@ -1130,9 +1073,19 @@ def png_name_main_algo(ocr_name, scores, ref_data):
     if partial_similarity > 44:
       scores[name] += partial_similarity
       img_score[name] += partial_similarity
-  if hit and hit in ref_data[2]:
-    hit = png_name_similarity_check(hit, ocr_name, ref_data[2][hit])
   return hit, scores, img_score
+# -------------------------------------
+
+# -------------------------------------
+def png_name_score_check(scores, img_n, min_total_perc, leading_factor=1.35):
+  if scores and img_n:
+    msn, *rest = png_name_sorted_scores(scores)
+    valid_score = img_n * 2 * min_total_perc
+    if len(scores) > 1:
+      valid_score = max(leading_factor * rest[0][1], valid_score)
+    if msn[1] >= valid_score:
+      return msn[0]
+  return ''
 # -------------------------------------
 
 # -------------------------------------
@@ -1153,50 +1106,8 @@ def png_name_similarity_check(hit, ocr_name, simil_names):
 # -------------------------------------
 
 # -------------------------------------
-def png_ocr_yield_name_from_image_variations(cv_data):
-  for idx, (image, size_key) in enumerate(cv_data[IMG_VARIATIONS], 1):
-    top, bot, left, right = cv_data[ROI][size_key]
-    ocr = image_to_string(image[top:bot,left:right], config='--psm 7').strip()
-    if cv_data[NP]:
-      for split_chars in SPLIT_CHARS:
-        ocr = ocr.rsplit(split_chars, maxsplit=1)[0]
-    yield idx, ocr.strip(STRIP_CHARS)
-# -------------------------------------
-
-# -------------------------------------
-def png_read_row(data, png_vals):
-  avails, hours, extra = png_row_availabities(*png_vals[AV_ARGS])
-  if not avails:
-    data[CNT][NOAV] += 1
-    return data
-  name, ocr_read = png_name_determination(*png_vals[NAME_ARGS])
-  if DEV == 2:
-    print(
-      f'row={png_vals[ROW_N]}, y={png_vals[AV_ARGS][:2]}, '
-      f'{ocr_read=}, {name=}, {avails=}'
-    )
-    print(''.center(80, '.'))
-  data[DNA].append((*png_vals[LOG_DATA], avails[:-1], name, ocr_read))
-  if not name:
-    data[CNT][NOCR] += 1
-    data[LOG] += print_no_name_determined(avails, name, ocr_read, png_vals)
-  elif png_vals[DATE] in data[DON][name]:
-    data[CNT][DUPL] += 1
-  else:
-    data[CNT][LINK] += 1
-    data[AVA][name].append(avails)
-    data[HRS][name] += hours
-    data[XTR][name] += extra
-    data[DON][name].add(png_vals[DATE])
-  return data
-# -------------------------------------
-
-# -------------------------------------
-def png_read_screenshot(data, png_vals):
-  data[CNT][SCAN] += png_vals[ROW_CNT]
-  for png_vals in png_values_row_update(png_vals):
-    data = png_read_row(data, png_vals)
-  return data
+def png_name_sorted_scores(scores, result_cnt=5):
+  return sorted(scores.items(), key=lambda x: x[1], reverse=True)[:result_cnt]
 # -------------------------------------
 
 # -------------------------------------
@@ -1244,7 +1155,35 @@ def png_row_check_cell_filling(x_test, top, bot, img):
 # -------------------------------------
 
 # -------------------------------------
-def png_save_determined_names_log(data, kw_dir, city):
+def png_row_get_data(data, png_vals):
+  avails, hours, extra = png_row_availabities(*png_vals[AV_ARGS])
+  if not avails:
+    data[CNT][NOAV] += 1
+    return data
+  name, ocr_read = png_name_determination(*png_vals[NAME_ARGS])
+  if DEV == 2:
+    print(
+      f'row={png_vals[ROW_N]}, y={png_vals[AV_ARGS][:2]}, '
+      f'{ocr_read=}, {name=}, {avails=}'
+    )
+    print(''.center(80, '.'))
+  data[DNA].append((*png_vals[LOG_DATA], avails[:-1], name, ocr_read))
+  if not name:
+    data[CNT][NOCR] += 1
+    data[LOG] += print_no_name_determined(avails, name, ocr_read, png_vals)
+  elif png_vals[DATE] in data[DON][name]:
+    data[CNT][DUPL] += 1
+  else:
+    data[CNT][LINK] += 1
+    data[AVA][name].append(avails)
+    data[HRS][name] += hours
+    data[XTR][name] += extra
+    data[DON][name].add(png_vals[DATE])
+  return data
+# -------------------------------------
+
+# -------------------------------------
+def png_save_determined_names_logfile(data, kw_dir, city):
   DataFrame(data, columns=DF_DET_COLUMNS).to_excel(
     join(kw_dir, f'det_names_{city}_{START_DT}.xlsx')
     , sheet_name=city
@@ -1255,7 +1194,68 @@ def png_save_determined_names_log(data, kw_dir, city):
 # -------------------------------------
 
 # -------------------------------------
-def png_screenshot_values(date_str, img, ref_data):
+def png_values_cv_data(rows, row_cnt, left, first_col, img):
+  mid_row_n = row_cnt // 2
+  row_height = rows[mid_row_n + 1] - rows[mid_row_n]
+  resize_factor = 109 / row_height
+  right = int(.29 * first_col)
+  res_width = int(resize_factor * right)
+  res_height = int(resize_factor * img.shape[0])
+  res_img = cv.resize(img[:, left:right], (res_width, res_height))
+  img_variations = (
+    (cv.threshold(res_img, 220, 255, cv.THRESH_BINARY)[1], 'resize')
+    , (CLAHE_DEF.apply(res_img), 'resize')
+    , (cv.threshold(res_img, 212, 255, cv.THRESH_BINARY)[1], 'resize')
+    , (cv.filter2D(res_img, -1, KERNEL_SHARP), 'resize')
+    , (CLAHE_L3_S7.apply(res_img), 'resize')
+  )
+  if EIV:
+    img_variations += png_values_extend_image_variations(img, res_img)
+  if DEV == 1:
+    print(
+      f'{mid_row_n=}, {img.shape=}, {row_height=}, {resize_factor=}, '
+      f'{right=}, {res_width=}, {res_height=}'
+    )
+  return {
+    BAD_RESO: row_height < 21
+    , IMG_VARIATIONS: img_variations
+    , RE_MA: int(resize_factor * png_calc_margin(rows, row_height))
+    , RE_ROW: [int(resize_factor * row) for row in rows]
+    , RI: right
+    , ROI: {'orig': [0, 0, left, right], 'resize': [0, 0, 0, res_width]}
+    , VALID: png_calc_min_valid_perc(row_height)
+  }
+# -------------------------------------
+
+# -------------------------------------
+def png_values_extend_image_variations(img, res_img):
+  return (
+    (cv.threshold(res_img, 225, 255, cv.THRESH_BINARY)[1], 'resize')
+    , (cv.threshold(res_img, 205, 255, cv.THRESH_BINARY)[1], 'resize')
+    , (res_img, 'resize')
+    , (CLAHE_L4_S7.apply(res_img), 'resize')
+    , (img, 'orig')
+    , (CLAHE_L2_S6.apply(res_img), 'resize')
+    , (cv.threshold(
+      cv.filter2D(res_img, -1, KERNEL_ALT), 212, 255, cv.THRESH_BINARY)[1]
+      , 'resize'
+    )
+    , (cv.threshold(img, 220, 255, cv.THRESH_BINARY)[1], 'orig')
+  )
+# -------------------------------------
+
+# -------------------------------------
+def png_values_get_margin(rows, row_height):
+  return 0 if rows[-1] - rows[-2] < row_height * 2 // 3 else 3
+# -------------------------------------
+
+# -------------------------------------
+def png_values_get_min_valid_perc(height):
+  return 33 if height < 19 else 66 if height > 65 else height * 11 / 6
+# -------------------------------------
+
+# -------------------------------------
+def png_values_image(date_str, img, ref_data):
   rows, left = png_grid_capture_rows(img)
   cols, col_cnt, x_valid = png_grid_capture_cols(rows, left, img)
   if x_valid is None:
@@ -1267,16 +1267,50 @@ def png_screenshot_values(date_str, img, ref_data):
       return {ROW_CNT: 0}
   if row_cnt == 0:
     return {ROW_CNT: 0}
+  cv_data = png_values_cv_data(rows, row_cnt, left, cols[0], img)
   return {
     ROWS: rows
     , ROW_CNT: row_cnt
-    , NAME_ARGS: [ref_data, png_cv_data(rows, row_cnt, left, cols[0], img)]
+    , NAME_ARGS: [ref_data, cv_data]
     , AV_ARGS: [None, None, cols, len(cols), date_str, img]
   }
 # -------------------------------------
 
 # -------------------------------------
-def png_values_row_update(png_vals):
+def png_values_yield_images(ref_data, png_dir, year, kw, city):
+  kw_dates = [str(date.fromisocalendar(year, kw, i)) for i in range(1, 8)]
+  pngs = sorted(listdir(png_dir))
+  image_vals = {}
+  for png_n, png in enumerate(pngs):
+    png_split = png.split('_')
+    if len(png_split) != 2:
+      continue
+    day, file_suf = png_split
+    file_idx = file_suf.split('.')[0]
+    date_str = parse_date(day, kw_dates)
+    if (day not in DAYS) or ((FIDX is not None) and (file_idx != FIDX)):
+      continue
+    img = cv.imread(join(png_dir, png), cv.IMREAD_GRAYSCALE)
+    if DEV >= 1:
+      print(f'{png=}'.center(80, '='))
+    image_vals = png_values_image(date_str, img, ref_data)
+    if image_vals[ROW_CNT] == 0:
+      continue
+    yield {
+      **image_vals
+      , DATE: date_str
+      , IMG: img
+      , LOG_DATA: [day, file_idx, kw, city, None]
+      , BAR: [png, len(pngs), png_n]
+      , PNG: png
+      , PNG_N: png_n
+    }
+  if image_vals.get(ROWS, None) is None:
+    return []
+# -------------------------------------
+
+# -------------------------------------
+def png_values_yield_rows(png_vals):
   cv_vals = png_vals[NAME_ARGS][1]
   start_row = 0 if ROW < 2 else ROW - 1
   e_row = ROW if not ENDROW else -1 if ENDROW >= png_vals[ROW_CNT] else ENDROW
@@ -1296,39 +1330,6 @@ def png_values_row_update(png_vals):
     yield png_vals
   if DEV >= 1:
     print(''.center(80, '='))
-# -------------------------------------
-
-# -------------------------------------
-def png_yield_values(ref_data, png_dir, year, kw, city):
-  kw_dates = [str(date.fromisocalendar(year, kw, i)) for i in range(1, 8)]
-  pngs = sorted(listdir(png_dir))
-  screen_vals = {}
-  for png_n, png in enumerate(pngs):
-    png_split = png.split('_')
-    if len(png_split) != 2:
-      continue
-    day, file_suf = png_split
-    file_idx = file_suf.split('.')[0]
-    date_str = parse_date(day, kw_dates)
-    if (day not in DAYS) or ((FIDX is not None) and (file_idx != FIDX)):
-      continue
-    img = cv.imread(join(png_dir, png), cv.IMREAD_GRAYSCALE)
-    if DEV >= 1:
-      print(f'{png=}'.center(80, '='))
-    screen_vals = png_screenshot_values(date_str, img, ref_data)
-    if screen_vals[ROW_CNT] == 0:
-      continue
-    yield {
-      **screen_vals
-      , DATE: date_str
-      , IMG: img
-      , LOG_DATA: [day, file_idx, kw, city, None]
-      , BAR: [png, len(pngs), png_n]
-      , PNG: png
-      , PNG_N: png_n
-    }
-  if screen_vals.get(ROWS, None) is None:
-    return []
 # -------------------------------------
 
 # -------------------------------------
@@ -1389,11 +1390,13 @@ def print_progress_bar(bar_data, row_cnt, row_n):
 def process_screenshots(ref_data, dirs, year, kw, city):
   data = deepcopy(PNG_PROCESSING_DICT)
   data[LOG] = print_log_header(PROCESS_PNG_MSG)
-  for png_vals in png_yield_values(ref_data, dirs[3], year, kw, city):
-    data = png_read_screenshot(data, png_vals)
+  for png_vals in png_values_yield_images(ref_data, dirs[3], year, kw, city):
+    data[CNT][SCAN] += png_vals[ROW_CNT]
+    for png_vals in png_values_yield_rows(png_vals):
+      data = png_row_get_data(data, png_vals)
   if data[DNA]:
     data[LOG] += print_log(parse_stats_msg(data[CNT]), end=BR)
-    png_save_determined_names_log(data[DNA], dirs[1], city)
+    png_save_determined_names_logfile(data[DNA], dirs[1], city)
   else:
     data[LOG] += print_log(NO_SCREENS_MSG, 'XXXXX ', BR)
   return data
@@ -1506,7 +1509,6 @@ def rider_ee_pre_c_update(df_row, contract, kw_date):
   for contract_line in prev_contracts_string.split(NL):
     fe_le, prev_contract = contract_line.split(' | ')
     first_entry, last_entry = map(date.fromisoformat, fe_le.split(' - '))
-    pre = NL if updated_prev_c else ''
     if contract == prev_contract:
       if kw_date < first_entry:
         first_entry = kw_date
@@ -1521,7 +1523,7 @@ def rider_ee_pre_c_update(df_row, contract, kw_date):
     else:
       new_line = f'{kw_date} - {kw_date} | {contract}{NL}{contract_line}'
       contract_in_prev_c = True
-    updated_prev_c += pre + new_line
+    updated_prev_c += ('' if updated_prev_c == '' else NL) + new_line
   return updated_prev_c
 # -------------------------------------
 

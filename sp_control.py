@@ -3,14 +3,14 @@
 # =================================================================
 # -------------------------------------
 from collections import defaultdict
-from copy import deepcopy
+import copy
 from datetime import date, datetime, timedelta
-from os import get_terminal_size, listdir, makedirs
+import os
 from os.path import abspath, basename, dirname, exists, join
 import shutil
 import signal
 import sys
-from time import perf_counter
+import time
 # -------------------------------------
 import cv2 as cv
 from fuzzywuzzy import fuzz
@@ -236,7 +236,7 @@ EE_BACKUP = f'{EE}.xlsx'
 LOG_FN = f'report_{START_DT}.log'
 OUTPUT_DIR = join(BASE_DIR, 'Schichtplan_bearbeitet')
 if not exists(OUTPUT_DIR):
-  makedirs(OUTPUT_DIR)
+  os.makedirs(OUTPUT_DIR)
 OUT_FILE_PRE = ''
 SPD_DIR = join(BASE_DIR, 'Schichtplan_Daten', str(YEAR))
 # -------------------------------------
@@ -252,6 +252,7 @@ CONVERT_COLS_MONTH = (
   , (PAI, 'Total paid hours')
   , (UNP, 'Unpaid leaves (hours)')
 )
+DEF_CITY = ('Frankfurt', 'Offenbach')
 DF_DET_COLUMNS = ('kw', CIT, 'day', 'index', 'row', 'avail', 'name', 'ocr')
 DIGITS = {*map(str, range(10))}
 INVALID_WORDS = {'wochenstunden', 'gefahrene'}
@@ -270,8 +271,8 @@ TIMEBLOCK_STRINGS = (
   , '23:00', '23:30'
 )
 WEEKDAYS = (
-  'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag'
-  , 'Samstag', 'Sonntag'
+  'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'
+  , 'Sonntag'
 )
 WEEKDAY_ABREVATIONS = (
   ('mo', 'mon'), ('di', 'tue'), ('mi', 'wed'), ('do', 'thu'), ('fr', 'fri')
@@ -282,6 +283,15 @@ WEEKDAY_ABREVATIONS = (
 # -------------------------------------
 # ### DICTS ###
 # -------------------------------------
+ALIAS = {
+  'Frankfurt': ('frankfurt', 'ffm', 'frankfurt am main')
+  , 'Fürth': ['fürth', 'fuerth']
+  , 'Nürnberg': ['nuernberg', 'nuremberg', 'nue']
+  , 'Offenbach': ('offenbach', 'of', 'offenbach am main')
+  , AVA: ('Verfügbarkeit', 'Verfügbarkeiten', 'Availabilities')
+  , MON: ('Monatsstunden', 'Stunden', 'Working Hours')
+  , SHI: ('Schichtplan', 'Schichtplanung', 'Working Shifts')
+}
 COLOR = {
   EMPTY: 225
   , FILLED: {*range(93, 116), 126}
@@ -424,29 +434,21 @@ XLS_REPORT_COND_FMT = (
 # -------------------------------------
 # ### LOAD CONFIGURATION FILE ###
 # -------------------------------------
-if not exists(CONFIG_FP):
-  print(CONFIG_MISSING_MSG)
-  DEF_CITY = ['Frankfurt', 'Offenbach']
-  ALIAS = {
-    'Frankfurt': ('frankfurt', 'ffm', 'frankfurt am main')
-    , 'Fürth': ['fürth', 'fuerth']
-    , 'Nürnberg': ['nuernberg', 'nuremberg', 'nue']
-    , 'Offenbach': ('offenbach', 'of', 'offenbach am main')
-    , AVA: ('Verfügbarkeit', 'Verfügbarkeiten', 'Availabilities')
-    , MON: ('Monatsstunden', 'Stunden', 'Working Hours')
-    , SHI: ('Schichtplan', 'Schichtplanung', 'Working Shifts')
-  }
-else:
+if exists(CONFIG_FP):
   import json
-  with open(CONFIG_FP) as file_path:
+  with open(CONFIG_FP, encoding='utf-8') as file_path:
     config = json.load(file_path)
   DEF_CITY = config['cities']
-  ALIAS = {k: tuple(a for a in als) for k, als in config['aliases'].items()}
   if 'win' in sys.platform:
     from pytesseract import pytesseract
-    pytesseract.tesseract_cmd = config['tesseract']['cmd_path']
+    pytesseract.tesseract_cmd = config['cmd_path']
   if 'password' in config:
     PW = config['password'] or None
+# -------------------------------------
+
+# -------------------------------------
+# ### CHECK TESSERACT AVAILABILITY ###
+# -------------------------------------
 try:
   get_tesseract_version()
   TESSERACT_AVAILABLE = True
@@ -473,7 +475,7 @@ signal.signal(signal.SIGINT, keyboard_interrupt_handler)
 def check_make_dir(*args):
   dir_path = join(*args)
   if not exists(dir_path):
-    makedirs(dir_path)
+    os.makedirs(dir_path)
   return dir_path
 # -------------------------------------
 
@@ -724,7 +726,7 @@ def load_shift_xlsx_into_df(df):
 def load_xlsx_data_into_dfs(city, dirs, log):
   dfs = {MON: None, LOG: log}
   mendatory = [ALIAS[AVA][0], ALIAS[SHI][0]]
-  for filename in listdir(dirs[0]):
+  for filename in os.listdir(dirs[0]):
     fn_cf = filename.casefold().replace('_', ' ').replace('-', ' ')
     if invalid_city_xlsx_filename(fn_cf, city):
       continue
@@ -778,7 +780,7 @@ def parse_city_ee_filepath(city, ree_dir):
 
 # -------------------------------------
 def parse_city_runtime(city, start):
-  return f'runtime {city = }: {perf_counter() - start:.2f} s'
+  return f'runtime {city = }: {time.perf_counter() - start:.2f} s'
 # -------------------------------------
 
 # -------------------------------------
@@ -794,7 +796,7 @@ def parse_progress_bar(bar_len, prog, pre, suf):
 
 # -------------------------------------
 def parse_run_end_msg(start):
-  return f'TOTAL RUNTIME: {perf_counter() - start:.2f} s'
+  return f'TOTAL RUNTIME: {time.perf_counter() - start:.2f} s'
 # -------------------------------------
 
 # -------------------------------------
@@ -1159,11 +1161,11 @@ def png_values_image(date_str, img, ref_data):
     , AV_ARGS: [None, None, cols, col_cnt, date_str, img]
   }
 # -------------------------------------
-
+import imageio
 # -------------------------------------
 def png_values_yield_images(ref_data, png_dir, year, kw, city):
   kw_dates = [str(date.fromisocalendar(year, kw, i)) for i in range(1, 8)]
-  pngs = sorted(listdir(png_dir))
+  pngs = sorted(os.listdir(png_dir))
   image_vals = {}
   for png_n, png in enumerate(pngs):
     png_split = png.split('_')
@@ -1172,6 +1174,10 @@ def png_values_yield_images(ref_data, png_dir, year, kw, city):
     day, file_suf = png_split
     date_str = parse_date(day, kw_dates)
     img = cv.imread(join(png_dir, png), cv.IMREAD_GRAYSCALE)
+    if img is None:
+      shutil.copy(join(png_dir, png), png)
+      img = cv.imread(png, cv.IMREAD_GRAYSCALE)
+      os.remove(png)
     image_vals = png_values_image(date_str, img, ref_data)
     if image_vals[ROW_CNT] == 0:
       continue
@@ -1252,7 +1258,7 @@ def print_progress_bar(bar_data, row_cnt, row_n):
     print_end = '\r\n-----\n'
     suf = f'... DONE'
   bar_str = parse_progress_bar(30, progress, pre, suf)
-  padding = get_terminal_size().columns - len(bar_str) - 13
+  padding = os.get_terminal_size().columns - len(bar_str) - 13
   if padding < 0:
     bar_str = parse_progress_bar(30 + padding, progress, pre, suf)
   print(bar_str, ' ' * 12, sep='', end=print_end, flush=True)
@@ -1287,7 +1293,7 @@ def processed_xlsx_data_to_report_df(dfs):
 
 # -------------------------------------
 def process_screenshots(ref_data, city, year, kw, dirs):
-  data = deepcopy(PNG_PROCESSING_DICT)
+  data = copy.deepcopy(PNG_PROCESSING_DICT)
   data[LOG] = print_log_header(PROCESS_PNG_MSG)
   for png_vals in png_values_yield_images(ref_data, dirs[3], year, kw, city):
     data[COUNTER][SCAN] += png_vals[ROW_CNT]
@@ -1498,7 +1504,7 @@ def rider_ee_update_names(kw_date, city, dfs):
 def screenshots_list_of_daily_files(day, png_dir, Image):
   return [
     Image.open(join(png_dir, day_fn))
-    for day_fn in sorted(fn for fn in listdir(png_dir) if day in fn)
+    for day_fn in sorted(fn for fn in os.listdir(png_dir) if day in fn)
   ]
 # -------------------------------------
 
@@ -1522,7 +1528,7 @@ def screenshots_merge_daily_files(city, dirs):
 
 # -------------------------------------
 def shiftplan_check(city, year, kw, dirs, get_ava, merge, tidy_only, ee_only):
-  start = perf_counter()
+  start = time.perf_counter()
   log = print_log_header(parse_sp_check_msg(city, year, kw))
   log += tidy_screenshot_files(city, dirs, merge)
   if tidy_only:
@@ -1610,7 +1616,7 @@ def tidy_filename_query(fn):
 
 # -------------------------------------
 def tidy_jpg_files(city, dirs):
-  jpg_files = [fn for fn in listdir(dirs[0]) if fn.endswith('.jpg')]
+  jpg_files = [fn for fn in os.listdir(dirs[0]) if fn.endswith('.jpg')]
   if not jpg_files:
     return ''
   log = print_log_header(TIDY_JPG_MSG)
@@ -1634,7 +1640,7 @@ def tidy_jpg_files(city, dirs):
 
 # -------------------------------------
 def tidy_png_files(city, dirs):
-  png_files = [fn for fn in listdir(dirs[0]) if fn.endswith('.png')]
+  png_files = [fn for fn in os.listdir(dirs[0]) if fn.endswith('.png')]
   if not png_files:
     return ''
   log = print_log_header(TIDY_PNG_MSG)
@@ -1694,7 +1700,7 @@ def tidy_screenshot_fn(original, fn_cf, idx_dict, log, suf='png'):
 
 # -------------------------------------
 def tidy_zip_files(city, dirs):
-  zip_files = [fn for fn in listdir(dirs[0]) if fn.endswith('.zip')]
+  zip_files = [fn for fn in os.listdir(dirs[0]) if fn.endswith('.zip')]
   if not zip_files:
     return ''
   from zipfile import ZipFile
@@ -1726,7 +1732,7 @@ def tidy_zip_files(city, dirs):
 # =================================================================
 # -------------------------------------
 def main(year, start_kw, last_kw, cities, *args):
-  start = perf_counter()
+  start = time.perf_counter()
   log = print_log_header(INITIAL_MSG, pre='=', suf='=')
   if last_kw < start_kw:
     last_kw = start_kw

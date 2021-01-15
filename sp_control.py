@@ -5,23 +5,17 @@
 from collections import defaultdict
 from copy import deepcopy
 from datetime import date, datetime, timedelta
-import getpass
-import io
-import json
 from os import get_terminal_size, listdir, makedirs
 from os.path import abspath, basename, dirname, exists, join
 import shutil
 import signal
 import sys
 from time import perf_counter
-from zipfile import ZipFile
 # -------------------------------------
 import cv2 as cv
 from fuzzywuzzy import fuzz
-import msoffcrypto
 import numpy as np
 from pandas import DataFrame, ExcelWriter, read_excel, to_datetime
-from PIL import Image
 from pytesseract.pytesseract import (
   get_tesseract_version, image_to_string, TesseractNotFoundError
 )
@@ -71,6 +65,7 @@ BAR = 'progress_bar_data'
 BG_COL = 'bg_color'
 BOLD = 'bold'
 BOR = 'border'
+BORDER = 'vertical_boundries'
 BR = '\n-----'
 CAL = 'call'
 CC_FE = 'current contract first entry'
@@ -79,18 +74,17 @@ CHE = 'check'
 CITY_LOG_PRE = ' LOG FOR CITY:'
 CIT = 'city'
 CMT = 'comment'
-CNT = 'counter'
 CONFIG_MISSING_MSG = '##### missing config file, using default values ...\n'
 CON_H = 'Contracted hours'
 CON_TYP = 'contract type'
+COUNTER = 'counter'
 CO_SC = '3_color_scale'
 CO_TY = 'Contract Type'
 CREATE_XLSX_MSG = ' CREATE WEEKLY XLSX REPORT '
 CRI = 'criteria'
 DATE = 'date'
 DEL = 'delete_color'
-DNA = 'det_name'
-DON = 'done'
+DONE = 'processed_day_and_rider'
 DRI = 'Driver'
 DR_ID = 'Driver ID'
 DUPL = 'duplicates'
@@ -100,6 +94,7 @@ FILLED = 'filled_availability_cell'
 FI_ENT = 'first entry'
 FMT = 'format'
 FO_SI = 'font_size'
+FRAME = 'histgram_test_frame'
 FR_HO = 'From Hour'
 GIV = 'given'
 GIV_AVA = 'given/avail'
@@ -144,7 +139,7 @@ NAME_BOX = 'name_box_in_av_cells'
 NF = 'NOT FOUND '
 NL = '\n'
 NOAV = 'no_avail'
-NOCR = 'no_ocr'
+NOOCR = 'no_ocr'
 NODA = 'no_data'
 NOT_AV_MON = 'NOT IN AVAILS OR MONTH'
 NOT_IN_AV = 'NOT IN AVAILS'
@@ -247,7 +242,7 @@ SPD_DIR = join(BASE_DIR, 'Schichtplan_Daten', str(YEAR))
 # -------------------------------------
 
 # -------------------------------------
-# ### TUPLES ###
+# ### SETS AND TUPLES ###
 # -------------------------------------
 CONVERT_COLS_MONTH = (
   (PAI_MAX, None)
@@ -258,7 +253,8 @@ CONVERT_COLS_MONTH = (
   , (UNP, 'Unpaid leaves (hours)')
 )
 DF_DET_COLUMNS = ('kw', CIT, 'day', 'index', 'row', 'avail', 'name', 'ocr')
-INVALID_WORDS = ('wochenstunden', 'gefahrene')
+DIGITS = {*map(str, range(10))}
+INVALID_WORDS = {'wochenstunden', 'gefahrene'}
 REPORT_HEADER = (
   ID, RID_NAM, CON_TYP, MAX, MIN, AVA, GIV, GIV_AVA, GIV_MAX, GIV_SHI, AVAILS
   , PAI_MAX, WOR, VAC, SIC, PAI, UNP, CMT, CAL, 'cmt shift coordinator'
@@ -273,10 +269,10 @@ TIMEBLOCK_STRINGS = (
   , '19:00', '19:30', '20:00', '20:30', '21:00', '21:30', '22:00', '22:30'
   , '23:00', '23:30'
 )
-WEEKDAYS = [
+WEEKDAYS = (
   'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag'
   , 'Samstag', 'Sonntag'
-]
+)
 WEEKDAY_ABREVATIONS = (
   ('mo', 'mon'), ('di', 'tue'), ('mi', 'wed'), ('do', 'thu'), ('fr', 'fri')
   , ('sa', 'sat'), ('so', 'sun')
@@ -288,12 +284,12 @@ WEEKDAY_ABREVATIONS = (
 # -------------------------------------
 COLOR = {
   EMPTY: 225
-  , FILLED: {*range(93, 111), 126}
+  , FILLED: {*range(93, 116), 126}
   , NAME_BOX: 64
   , NP: {228, 238}
   , SCROLL_BAR: {*range(236, 246)}
   , SHI: {*range(143, 151)}
-  , LINE: {195, *range(208, 234)}
+  , LINE: {195, *range(208, 236)}
   , TIME_CELL: {245}
   , WHITE: {*range(246, 256)}
 }
@@ -310,14 +306,15 @@ CON_BY_H = defaultdict(
     , 174: 'Vollzeit'  
   }
 )
+_mini_min_h = int(60 / 13) / 2
 CON_BY_N = defaultdict(
   lambda: (NO_DA, NO_DA), {
     'Arbeitnehmerüberlassung': (0, 20)
     , 'Foodora_Midijob': (12, 40)
-    , 'Foodora_Minijob': ('10h/Monat', 15)
+    , 'Foodora_Minijob': (_mini_min_h, 15)
     , 'Foodora_Working Student': (12, 20)
     , 'Midijob': (12, 40)
-    , 'Minijob': ('10h/Monat', 15)
+    , 'Minijob': (_mini_min_h, 15)
     , 'Minijobber': (5, 11)
     , 'Mini-Jobber': (5, 11)
     , 'TE Midijob': (12, 28)
@@ -336,11 +333,11 @@ EXTRA_HOURS_BEGIN = defaultdict(int, {21: 1, 22: .5})
 EXTRA_HOURS_END = {21: 1, 22: 1, 23: 1, 24: .5, 25: 0, 26: 0}
 PNG_PROCESSING_DICT = {
   AVA: defaultdict(list)
-  , DON: defaultdict(set)
+  , DONE: defaultdict(set)
   , HRS: defaultdict(int)
   , XTR: defaultdict(int)
-  , CNT: defaultdict(int)
-  , DNA: list()
+  , COUNTER: defaultdict(int)
+  , LOG_DATA: list()
 }
 TIMES = {
   21: TIMEBLOCK_STRINGS[2:-2]
@@ -387,7 +384,6 @@ RIDER_EE_COL_FMT = (
   , ('G:G', 25, 'text')
   , ('H:H', 35, 'text')
   , ('I:I', 15, 'text')
-  # , ('J:J', 20, 'text')
 )
 RIDER_EE_CONDS = (('C2:C', MIN, 'red'), ('F2:F', DATE, 'old'))
 RIDER_EE_FMTS = ('int', 'old', 'red', 'text')
@@ -441,6 +437,7 @@ if not exists(CONFIG_FP):
     , SHI: ('Schichtplan', 'Schichtplanung', 'Working Shifts')
   }
 else:
+  import json
   with open(CONFIG_FP) as file_path:
     config = json.load(file_path)
   DEF_CITY = config['cities']
@@ -478,21 +475,6 @@ def check_make_dir(*args):
   if not exists(dir_path):
     makedirs(dir_path)
   return dir_path
-# -------------------------------------
-
-# -------------------------------------
-def create_report_df(dfs):
-  data_list = []
-  src = AVA if dfs[MON] is None else MON
-  for name, df_row in dfs[src].iterrows():
-    data = get_new_df_entry()
-    data.update(get_base_data(name, df_row, src, dfs[AVA]))
-    data.update(get_min_hours(dfs[EE], dfs[REF][3], data[CON_TYP], name))
-    data.update(get_shifts(dfs[SHI], data[ID]))
-    data.update(get_given_hour_ratios(data[AVA], data[GIV], data[MAX]))
-    data.update(get_data_check_and_first_comment(data))
-    data_list.append(data)
-  return DataFrame(data_list).set_index(RID_NAM, drop=False)
 # -------------------------------------
 
 # -------------------------------------
@@ -671,20 +653,26 @@ def load_avail_xlsx_into_df(df):
 
 # -------------------------------------
 def load_decrpyted_xlsx(file_path):
+  import getpass
+  import io
+  import msoffcrypto
   global PW
   df = None
   print('file is encrypted... decrypting')
-  file = msoffcrypto.OfficeFile(open(file_path, 'rb'))
   tries = 5
-  while tries > 0:
+  while tries != 0:
     try:
       if PW is None:
         PW = getpass.getpass('enter password:')
-      file.load_key(password=PW)
       decrypted = io.BytesIO()
-      file.decrypt(decrypted)
+      with open(file_path, 'rb') as f:
+        file = msoffcrypto.OfficeFile(f)
+        file.load_key(password=PW)
+        file.decrypt(decrypted)
       df = read_excel(decrypted)
       break
+    except KeyboardInterrupt:
+      raise
     except:
       if tries:
         tries -= 1
@@ -821,7 +809,7 @@ def parse_stats_msg(counter):
     f'| T | duplicate rows       : {counter[DUPL]:4d}{NL}'
     f'| A | linked rows          : {counter[LINK]:4d}{NL}'
     f'| T | no availabilites     : {counter[NOAV]:4d}{NL}'
-    f'| S | not readable         : {counter[NOCR]:4d}'
+    f'| S | not readable         : {counter[NOOCR]:4d}'
   )
 # -------------------------------------
 
@@ -862,7 +850,11 @@ def png_grid_capture_rows(img):
   height_thresh = height // 2
   left = 0
   rows = []
+  skip = False
   for x in range(0, 50):
+    if skip is True:
+      skip = False
+      continue
     rows = [height]
     vert_line_cnt = y = 0
     for y in range(height - 1, -1, -1):
@@ -879,8 +871,9 @@ def png_grid_capture_rows(img):
       else:
         vert_line_cnt += 1
         if vert_line_cnt == 5:
+          skip = True
           break
-      if y <= rows[-1] - (40 if y < height_thresh else 110):
+      if y <= rows[-1] - (40 if y < height_thresh else 115):
         if len(rows) > 1:
           rows.append(2 * rows[-1] - rows[-2] + 4)
         else:
@@ -932,7 +925,15 @@ def png_grid_remove_invalid_rows(rows, x, img):
 
 # -------------------------------------
 def png_image_variations_yield_ocr_name(cv_data):
-  for image in cv_data[IMG_VARIATIONS]:
+  frame = cv_data[FRAME]
+  if np.mean(frame) <= 245:
+    for i in range(193, 208):
+      frame[frame == i] = 255
+    yield image_to_string(frame, config='--psm 7').strip().strip(STRIP_CHARS)
+    start_image_n = 2
+  else:
+    start_image_n = 0
+  for image in cv_data[IMG_VARIATIONS][start_image_n:]:
     top, bot, left, right = cv_data[ROI]
     ocr = image_to_string(image[top:bot,left:right], config='--psm 7').strip()
     if cv_data[NP]:
@@ -1086,33 +1087,22 @@ def png_row_check_cell_filling(x_test, top, bot, img):
 def png_row_get_data(data, png_vals):
   avails, hours, extra = png_row_availabities(*png_vals[AV_ARGS])
   if not avails:
-    data[CNT][NOAV] += 1
+    data[COUNTER][NOAV] += 1
     return data
   name, ocr_read = png_name_determination(*png_vals[NAME_ARGS])
-  data[DNA].append((*png_vals[LOG_DATA], avails[:-1], name, ocr_read))
+  data[LOG_DATA].append((*png_vals[LOG_DATA], avails[:-1], name, ocr_read))
   if not name:
-    data[CNT][NOCR] += 1
+    data[COUNTER][NOOCR] += 1
     data[LOG] += print_no_name_determined(avails, name, ocr_read, png_vals)
-  elif png_vals[DATE] in data[DON][name]:
-    data[CNT][DUPL] += 1
+  elif png_vals[DATE] in data[DONE][name]:
+    data[COUNTER][DUPL] += 1
   else:
-    data[CNT][LINK] += 1
+    data[COUNTER][LINK] += 1
     data[AVA][name].append(avails)
     data[HRS][name] += hours
     data[XTR][name] += extra
-    data[DON][name].add(png_vals[DATE])
+    data[DONE][name].add(png_vals[DATE])
   return data
-# -------------------------------------
-
-# -------------------------------------
-def png_save_determined_names_logfile(data, kw_dir, city):
-  DataFrame(data, columns=DF_DET_COLUMNS).to_excel(
-    join(kw_dir, f'det_names_{city}_{START_DT}.xlsx')
-    , sheet_name=city
-    , columns=DF_DET_COLUMNS
-    , index=False
-    , freeze_panes=(1, 0)
-  )
 # -------------------------------------
 
 # -------------------------------------
@@ -1133,10 +1123,10 @@ def png_values_cv_data(rows, row_cnt, left, first_col, img):
   )
   return {
     BAD_RESO: row_height < 21
+    , BORDER: (left, right)
     , IMG_VARIATIONS: img_variations
     , RE_MA: int(resize_factor * png_values_get_margin(rows, row_height))
     , RE_ROW: [int(resize_factor * row) for row in rows]
-    , RI: right
     , ROI: [0, 0, 0, res_width]
     , VALID: png_values_get_min_valid_perc(row_height)
   }
@@ -1189,7 +1179,7 @@ def png_values_yield_images(ref_data, png_dir, year, kw, city):
       **image_vals
       , DATE: date_str
       , IMG: img
-      , LOG_DATA: [day, file_suf.split('.')[0], kw, city, None]
+      , LOG_DATA: [kw, city, day, int(file_suf.split('.')[0]), None]
       , BAR: [png, len(pngs), png_n]
       , PNG: png
       , PNG_N: png_n
@@ -1200,16 +1190,17 @@ def png_values_yield_images(ref_data, png_dir, year, kw, city):
 
 # -------------------------------------
 def png_values_yield_rows(png_vals):
-  cv_vals = png_vals[NAME_ARGS][1]
+  cv_data = png_vals[NAME_ARGS][1]
   for row_n in range(1, png_vals[ROW_CNT] + 1):
     print_progress_bar(png_vals[BAR], png_vals[ROW_CNT], row_n)
     png_vals[LOG_DATA][4] = png_vals[ROW_N] = row_n
-    png_vals[AV_ARGS][0] = top = png_vals[ROWS][row_n - 1] + 2
-    png_vals[AV_ARGS][1] = png_vals[ROWS][row_n] - 2
-    cv_vals[ROI][0] = cv_vals[RE_ROW][row_n - 1]
-    cv_vals[ROI][1] = cv_vals[RE_ROW][row_n] - cv_vals[RE_MA]
-    cv_vals[NP] = png_vals[IMG][top + 2, cv_vals[RI]] in COLOR[NP]
-    png_vals[NAME_ARGS][1] = cv_vals
+    top = png_vals[AV_ARGS][0] = png_vals[ROWS][row_n - 1] + 2
+    bot = png_vals[AV_ARGS][1] = png_vals[ROWS][row_n] - 2
+    cv_data[FRAME] = png_vals[IMG][top:bot, slice(*cv_data[BORDER])]
+    cv_data[ROI][0] = cv_data[RE_ROW][row_n - 1]
+    cv_data[ROI][1] = cv_data[RE_ROW][row_n] - cv_data[RE_MA]
+    cv_data[NP] = png_vals[IMG][top, cv_data[BORDER][1]] in COLOR[NP]
+    png_vals[NAME_ARGS][1] = cv_data
     yield png_vals
 # -------------------------------------
 
@@ -1268,16 +1259,43 @@ def print_progress_bar(bar_data, row_cnt, row_n):
 # -------------------------------------
 
 # -------------------------------------
+def processed_ocr_data_to_logfile(data, kw_dir, city):
+  writer = ExcelWriter(join(kw_dir, f'det_names_{city}_{START_DT}.xlsx'))
+  DataFrame(data, columns=DF_DET_COLUMNS).to_excel(writer, city, index=False)
+  worksheet = writer.sheets[city]
+  worksheet.autofilter('A1:H1')
+  worksheet.freeze_panes(1, 0)
+  worksheet.set_column('B:C', 12)
+  worksheet.set_column('F:H', 35)
+  writer.save()
+# -------------------------------------
+
+# -------------------------------------
+def processed_xlsx_data_to_report_df(dfs):
+  data_list = []
+  src = AVA if dfs[MON] is None else MON
+  for name, df_row in dfs[src].iterrows():
+    data = get_new_df_entry()
+    data.update(get_base_data(name, df_row, src, dfs[AVA]))
+    data.update(get_min_hours(dfs[EE], dfs[REF][3], data[CON_TYP], name))
+    data.update(get_shifts(dfs[SHI], data[ID]))
+    data.update(get_given_hour_ratios(data[AVA], data[GIV], data[MAX]))
+    data.update(get_data_check_and_first_comment(data))
+    data_list.append(data)
+  return DataFrame(data_list).set_index(RID_NAM, drop=False)
+# -------------------------------------
+
+# -------------------------------------
 def process_screenshots(ref_data, city, year, kw, dirs):
   data = deepcopy(PNG_PROCESSING_DICT)
   data[LOG] = print_log_header(PROCESS_PNG_MSG)
   for png_vals in png_values_yield_images(ref_data, dirs[3], year, kw, city):
-    data[CNT][SCAN] += png_vals[ROW_CNT]
+    data[COUNTER][SCAN] += png_vals[ROW_CNT]
     for png_vals in png_values_yield_rows(png_vals):
       data = png_row_get_data(data, png_vals)
-  if data[DNA]:
-    data[LOG] += print_log(parse_stats_msg(data[CNT]), end=BR)
-    png_save_determined_names_logfile(data[DNA], dirs[1], city)
+  if data[LOG_DATA]:
+    data[LOG] += print_log(parse_stats_msg(data[COUNTER]), end=BR)
+    processed_ocr_data_to_logfile(data[LOG_DATA], dirs[1], city)
   else:
     data[LOG] += print_log(NO_SCREENS_MSG, 'XXXXX ', BR)
   return data
@@ -1291,7 +1309,7 @@ def process_xlsx_data(city, dirs, kw_date, log):
     return dfs
   dfs = rider_ee_update_names(kw_date, city, dfs)
   dfs[REF] = reference_names_and_contract_data(dfs[EE], kw_date)
-  dfs[REP] = create_report_df(dfs)
+  dfs[REP] = processed_xlsx_data_to_report_df(dfs)
   return dfs
 # -------------------------------------
 
@@ -1316,12 +1334,10 @@ def reference_contract_list(kw_date, df_kw):
 def reference_names_and_contract_data(df, kw_date):
   df_ref = df[(df[LA_ENT] > (kw_date - TOO_OLD)) & (df[FI_ENT] <= kw_date)]
   ref_names = df_ref[RID_NAM].to_list()
-  return (
-    ref_names
-    , reference_contract_list(kw_date, df_ref)
-    , {name: sim.split(';') for name, sim in df_ref[SIM_NAM].items() if sim}
-    , {*ref_names}
-  )
+  ref_contracts = reference_contract_list(kw_date, df_ref)
+  simil_dict = {name: x.split(';') for name, x in df_ref[SIM_NAM].items() if x}
+  names_set = {*ref_names}
+  return ref_names, ref_contracts, simil_dict, names_set
 # -------------------------------------
 
 # -------------------------------------
@@ -1411,7 +1427,7 @@ def rider_ee_pre_c_update(df_row, contract, kw_date):
 # -------------------------------------
 def rider_ee_to_formated_xlsx(city, ree_dir, df_ee):
   row_cnt = df_ee.shape[0] + 1
-  writer = ExcelWriter(parse_city_ee_filepath(city, ree_dir), 'xlsxwriter')
+  writer = ExcelWriter(parse_city_ee_filepath(city, ree_dir))
   df_ee.to_excel(writer, city, index=False)
   workbook = writer.book
   worksheet = writer.sheets[city]
@@ -1479,7 +1495,7 @@ def rider_ee_update_names(kw_date, city, dfs):
 # -------------------------------------
 
 # -------------------------------------
-def screenshots_list_of_daily_files(day, png_dir):
+def screenshots_list_of_daily_files(day, png_dir, Image):
   return [
     Image.open(join(png_dir, day_fn))
     for day_fn in sorted(fn for fn in listdir(png_dir) if day in fn)
@@ -1488,9 +1504,10 @@ def screenshots_list_of_daily_files(day, png_dir):
 
 # -------------------------------------
 def screenshots_merge_daily_files(city, dirs):
+  from PIL import Image
   log = print_log_header(MERGE_FILES_MSG)
   for day in WEEKDAYS:
-    images = screenshots_list_of_daily_files(day, dirs[3])
+    images = screenshots_list_of_daily_files(day, dirs[3], Image)
     widths, heights = zip(*(img.size for img in images))
     new_image = Image.new('RGB', (max(widths), sum(heights)))
     y_offset = 0
@@ -1587,6 +1604,11 @@ def shiftplan_report_to_formated_xlsx(df, city, kw):
 # -------------------------------------
 
 # -------------------------------------
+def tidy_filename_query(fn):
+  return ''.join(c for c in fn.casefold().replace('_', ' ') if c not in DIGITS)
+# -------------------------------------
+
+# -------------------------------------
 def tidy_jpg_files(city, dirs):
   jpg_files = [fn for fn in listdir(dirs[0]) if fn.endswith('.jpg')]
   if not jpg_files:
@@ -1597,17 +1619,16 @@ def tidy_jpg_files(city, dirs):
   raw_dir = check_make_dir(dirs[2], 'raw')
   vac_dir = check_make_dir(raw_dir, 'Urlaub')
   for fn in sorted(jpg_files):
-    fn_cf = fn.casefold().replace('_', ' ')
+    fn_cf = tidy_filename_query(fn)
     if not any(fuzz.WRatio(alias, fn_cf) > 86 for alias in ALIAS[city]):
       continue
     source = join(dirs[0], fn)
     if 'urlaub' in fn.casefold():
-      target = join(vac_dir, fn)
-    else:
-      target = join(raw_dir, fn)
-      proc_fn, idx_dict, log = tidy_screenshot_fn(fn, fn_cf, idx_dict, log)
-      Image.open(source).save(join(dirs[3], proc_fn))
-    shutil.move(source, target)
+      shutil.move(source, join(vac_dir, fn))
+      continue
+    new_fn, idx_dict, log = tidy_screenshot_fn(fn, fn_cf, idx_dict, log, 'jpg')
+    shutil.copy(source, join(dirs[3], new_fn))
+    shutil.move(source, join(raw_dir, fn))
   return log
 # -------------------------------------
 
@@ -1624,12 +1645,12 @@ def tidy_png_files(city, dirs):
     source = join(dirs[0], fn)
     if city == 'Frankfurt':
       fn = fn.replace('FF_', 'FFM_').replace('FF ', 'FFM ')
-    fn_cf = fn.casefold().replace('_', ' ')
+    fn_cf = tidy_filename_query(fn)
     if all(fuzz.partial_ratio(alias, fn_cf) < 87 for alias in ALIAS[city]):
       continue
-    proc_fn, idx_dict, log = tidy_screenshot_fn(fn, fn_cf, idx_dict, log)
+    new_fn, idx_dict, log = tidy_screenshot_fn(fn, fn_cf, idx_dict, log)
     shutil.copy(source, join(raw_dir, fn))
-    shutil.move(source, join(dirs[3], proc_fn))
+    shutil.move(source, join(dirs[3], new_fn))
   return log
 # -------------------------------------
 
@@ -1648,14 +1669,14 @@ def tidy_screenshot_files(city, dirs, merge):
 # -------------------------------------
 
 # -------------------------------------
-def tidy_screenshot_fn(original, fn_cf, idx_dict, log):
+def tidy_screenshot_fn(original, fn_cf, idx_dict, log, suf='png'):
   similarity = 0
   current_day = ''
   for weekday in WEEKDAYS:
     weekday_similarity = fuzz.partial_ratio(weekday, original)
     if weekday_similarity > similarity:
-      similarity = weekday_similarity
       current_day = weekday
+      similarity = weekday_similarity
       if similarity > 90:
         break
   if similarity <= 90:
@@ -1665,7 +1686,7 @@ def tidy_screenshot_fn(original, fn_cf, idx_dict, log):
         similarity = 100
         break
   idx_dict[current_day] += 1
-  png_filename = f'{current_day}_{idx_dict[current_day]}.png'
+  png_filename = f'{current_day}_{idx_dict[current_day]}.{suf}'
   if similarity != 100:
     log += print_log(f'{TAB}- {original = }, saved as = {png_filename}')
   return png_filename, idx_dict, log
@@ -1676,22 +1697,24 @@ def tidy_zip_files(city, dirs):
   zip_files = [fn for fn in listdir(dirs[0]) if fn.endswith('.zip')]
   if not zip_files:
     return ''
+  from zipfile import ZipFile
   log = print_log_header(UNZIP_MSG)
   log += print_log(ZIP_PNG_NAME_CHECK_MSG, '[X|O] ')
   idx_dict = defaultdict(int)
   for zip_filename in zip_files:
-    zip_cf = zip_filename.casefold()
+    zip_cf = tidy_filename_query(zip_filename)
     if all(fuzz.partial_ratio(alias, zip_cf) < 87 for alias in ALIAS[city]):
       continue
     log += print_log(zip_filename, TAB)
     with ZipFile(join(dirs[0], zip_filename)) as zfile:
       for member in sorted(zfile.namelist()):
         fn = basename(member)
-        if fn:
-          fn_cf = fn.casefold().replace('_', ' ')
-          fn, idx_dict, log = tidy_screenshot_fn(fn, fn_cf, idx_dict, log)
-          with open(join(dirs[3], fn), "wb") as target:
-            shutil.copyfileobj(zfile.open(member), target)
+        if not fn:
+          continue
+        fn_cf = tidy_filename_query(fn)
+        fn, idx_dict, log = tidy_screenshot_fn(fn, fn_cf, idx_dict, log)
+        with open(join(dirs[3], fn), "wb") as target:
+          shutil.copyfileobj(zfile.open(member), target)
     log += print_log('-----')
   return log
 # -------------------------------------

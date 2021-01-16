@@ -15,10 +15,8 @@ import time
 import cv2 as cv
 from fuzzywuzzy import fuzz
 import numpy as np
-from pandas import DataFrame, ExcelWriter, read_excel, to_datetime
-from pytesseract.pytesseract import (
-  get_tesseract_version, image_to_string, TesseractNotFoundError
-)
+import pandas as pd
+from pytesseract import pytesseract
 from xlrd.biffh import XLRDError
 # -------------------------------------
 # =================================================================
@@ -259,8 +257,7 @@ CONVERT_COLS_MONTH = (
   , (PAI, 'Total paid hours')
   , (UNP, 'Unpaid leaves (hours)')
 )
-DEF_CITY = ('Frankfurt', 'Offenbach')
-DF_DET_COLUMNS = ('kw', CIT, 'day', 'index', 'row', 'avail', 'name', 'ocr')
+DF_DET_COLS = ('kw', CIT, 'day', 'index', 'row', 'avail', 'name', 'ocr')
 DIGITS = {*map(str, range(10))}
 INVALID_WORDS = {'wochenstunden', 'gefahrene'}
 REPORT_HEADER = (
@@ -361,15 +358,6 @@ TIMES = {
 # -------------------------------------
 # ### XLSX FORMATS ###
 # -------------------------------------
-ALIAS = {
-  'Frankfurt': ('frankfurt', 'ffm', 'frankfurt am main')
-  , 'Fürth': ['fürth', 'fuerth']
-  , 'Nürnberg': ['nuernberg', 'nuremberg', 'nue']
-  , 'Offenbach': ('offenbach', 'of', 'offenbach am main')
-  , AVA: ('Verfügbarkeit', 'Verfügbarkeiten', 'Availabilities')
-  , MON: ('Monatsstunden', 'Stunden', 'Working Hours')
-  , SHI: ('Schichtplan', 'Schichtplanung', 'Working Shifts')
-}
 COND_FMT = {
   AVA: {TYP: 'text', CRI: 'ends with', VAL: ' '}
   , 'ee only': {TYP: 'text', CRI: 'ends with', VAL: NOT_AV_MON}
@@ -446,22 +434,34 @@ if exists(CONFIG_FP):
   import json
   with open(CONFIG_FP, encoding='utf-8') as file_path:
     config = json.load(file_path)
+  ALIAS = {k: tuple(x for x in alis) for k, alis in config['aliases'].items()}
   DEF_CITY = config['cities']
   if 'win' in sys.platform:
-    from pytesseract import pytesseract
     pytesseract.tesseract_cmd = config['tesseract']['cmd_path']
   if 'password' in config:
     PW = config['password']
+else:
+  ALIAS = {
+    'Frankfurt': ('frankfurt', 'ffm', 'frankfurt am main')
+    , 'Fürth': ['fürth', 'fuerth']
+    , 'Nürnberg': ['nuernberg', 'nuremberg', 'nue']
+    , 'Offenbach': ('offenbach', 'of', 'offenbach am main')
+    , AVA: ('Verfügbarkeit', 'Verfügbarkeiten', 'Availabilities')
+    , MON: ('Monatsstunden', 'Stunden', 'Working Hours')
+    , SHI: ('Schichtplan', 'Schichtplanung', 'Working Shifts')
+  }
+  DEF_CITY = ('Frankfurt', 'Offenbach')
 # -------------------------------------
 
 # -------------------------------------
 # ### CHECK TESSERACT AVAILABILITY ###
 # -------------------------------------
 try:
-  get_tesseract_version()
-  TESSERACT_AVAILABLE = True
-except TesseractNotFoundError:
+  pytesseract.get_tesseract_version()
+except pytesseract.TesseractNotFoundError:
   TESSERACT_AVAILABLE = False
+else:
+  TESSERACT_AVAILABLE = True
 # -------------------------------------
 
 # -------------------------------------
@@ -480,8 +480,8 @@ signal.signal(signal.SIGINT, keyboard_interrupt_handler)
 # ### FUNCTIONS ###
 # =================================================================
 # -------------------------------------
-def check_make_dir(*args):
-  dir_path = join(*args)
+def check_make_dir(*path_list):
+  dir_path = join(*path_list)
   if not exists(dir_path):
     os.makedirs(dir_path)
   return dir_path
@@ -608,7 +608,7 @@ def get_data_check_ratio_threshold(data):
 # -------------------------------------
 def get_given_hour_ratios(avail, given, max_h):
   if isinstance(avail, str):
-    max_ratio = avail_ratio = 0
+    avail_ratio = max_ratio = 0
   else:
     avail_ratio = round(given / avail, 2) if avail else 10
     max_ratio = round(given / max_h, 2) if not isinstance(max_h, str) else 0
@@ -685,11 +685,9 @@ def load_decrpyted_xlsx(file_path):
         file = msoffcrypto.OfficeFile(f)
         file.load_key(password=PW)
         file.decrypt(decrypted)
-      df = read_excel(decrypted)
+      df = pd.read_excel(decrypted)
       break
-    except KeyboardInterrupt:
-      raise
-    except:
+    except Exception:
       if tries:
         tries -= 1
         print(f'wrong password, {tries} tries left ...')
@@ -702,17 +700,17 @@ def load_decrpyted_xlsx(file_path):
 # -------------------------------------
 def load_ersterfassung_xlsx_into_df(city, ree_dir):
   try:
-    df = read_excel(parse_city_ee_filepath(city, ree_dir))
+    df = pd.read_excel(parse_city_ee_filepath(city, ree_dir))
   except FileNotFoundError:
     try:
-      df = read_excel(EE_BACKUP, city)
+      df = pd.read_excel(EE_BACKUP, city)
       df[SIM_NAM] = ''
       df[SIM_NAM] = rider_ee_get_similar_names(df[RID_NAM], df)
     except (FileNotFoundError, XLRDError):
-      df = DataFrame(columns=RIDER_MIN_HEADER)
-  df[FI_ENT] = to_datetime(df[FI_ENT], format=YMD).dt.date
-  df[LA_ENT] = to_datetime(df[LA_ENT], format=YMD).dt.date
-  df[CC_FE] = to_datetime(df[CC_FE], format=YMD).dt.date
+      df = pd.DataFrame(columns=RIDER_MIN_HEADER)
+  df[FI_ENT] = pd.to_datetime(df[FI_ENT], format=YMD).dt.date
+  df[LA_ENT] = pd.to_datetime(df[LA_ENT], format=YMD).dt.date
+  df[CC_FE] = pd.to_datetime(df[CC_FE], format=YMD).dt.date
   return df.fillna('').drop_duplicates(RID_NAM).set_index(RID_NAM, drop=False)
 # -------------------------------------
 
@@ -726,19 +724,19 @@ def load_month_xlsx_into_df(df):
 
 # -------------------------------------
 def load_shift_xlsx_into_df(df):
-  df[SH_DA] = to_datetime(df[SH_DA], format=DMY).dt.date
+  df[SH_DA] = pd.to_datetime(df[SH_DA], format=DMY).dt.date
   try:
-    df[FR_HO] = to_datetime(df[FR_HO], format=HM).dt.time
-    df[TO_HO] = to_datetime(df[TO_HO], format=HM).dt.time
+    df[FR_HO] = pd.to_datetime(df[FR_HO], format=HM).dt.time
+    df[TO_HO] = pd.to_datetime(df[TO_HO], format=HM).dt.time
   except (TypeError, ValueError):
-    df[FR_HO] = to_datetime(df[FR_HO], format=HMS).dt.time
-    df[TO_HO] = to_datetime(df[TO_HO], format=HMS).dt.time
+    df[FR_HO] = pd.to_datetime(df[FR_HO], format=HMS).dt.time
+    df[TO_HO] = pd.to_datetime(df[TO_HO], format=HMS).dt.time
   return df.sort_values([DRI, SH_DA, FR_HO]).set_index(DR_ID, drop=False)
 # -------------------------------------
 
 # -------------------------------------
-def load_xlsx_data_into_dfs(dirs, city, log):
-  dfs = {MON: None, LOG: log}
+def load_xlsx_data_into_dfs(dirs, city, dfs):
+  dfs[MON] = None
   mendatory = [ALIAS[AVA][0], ALIAS[SHI][0]]
   for filename in os.listdir(dirs[0]):
     fn_cf = filename.casefold().replace('_', ' ').replace('-', ' ')
@@ -747,10 +745,11 @@ def load_xlsx_data_into_dfs(dirs, city, log):
     if fuzz.WRatio(STD_REP, fn_cf) > 86:
       dfs[LOG] += print_log(f'|O.O| {STD_REP} file available, {filename = }')
       continue
+    full_path = join(dirs[0], filename)
     try:
-      df = read_excel(join(dirs[0], filename))
+      df = pd.read_excel(full_path)
     except XLRDError:
-      df = load_decrpyted_xlsx(join(dirs[0], filename))
+      df = load_decrpyted_xlsx(full_path)
       if df is None:
         break
     df.rename(columns=lambda x: str(x).strip(), inplace=True)
@@ -837,22 +836,25 @@ def png_grid_capture_cols(rows, left, img):
   row_cnt = len(rows)
   if row_cnt <= 1:
     return None, None, None
+  # ----- use found rows with offset as y value, start at the middle row -----
   for row_n in range(row_cnt // 2, row_cnt):
     cols.clear()
     row_height = rows[row_n] - rows[row_n - 1]
-    bot_margin = 4 if row_n == row_cnt - 1 else 2
+    bot_margin = 4 if row_n == (row_cnt - 1) else 2
+  # ----- horizontal iteration, skip unnecessary parts, get x values of cols --
     for x in range(left + 8 * row_height, img_width - 4):
       pixel_color = img[rows[row_n] - bot_margin, x]
       if DEV == 4 and pixel_color not in COLOR[WHITE] | COLOR[FILLED]:
         print(f'y={rows[row_n]}, {x=}, {pixel_color=}, not white or filled')
       if pixel_color in COLOR[TIME_CELL] | COLOR[SHI]:
         break
-      elif pixel_color in COLOR[LINE]:
+      if pixel_color in COLOR[LINE]:
         if cols and x <= cols[-1] + 5:
           del cols[-1]
         cols.append(x)
         if len(cols) == 26:
           break
+  # ----- check break condition, continue if column count < 21 -----
       elif cols and pixel_color in COLOR[SCROLL_BAR]:
         if x <= cols[-1] + 2:
           del cols[-1]
@@ -861,8 +863,9 @@ def png_grid_capture_cols(rows, left, img):
       break
   if DEV == 4:
     print('\n-----')
-  x_row_validation = left + (cols[0] - left) * 19 // 20 if cols else None
-  return cols, len(cols), x_row_validation
+  col_cnt = len(cols)
+  x_validation = left + (cols[0] - left) * 19 // 20 if col_cnt >= 21 else None
+  return cols, col_cnt, x_validation
 # -------------------------------------
 
 # -------------------------------------
@@ -872,12 +875,14 @@ def png_grid_capture_rows(img):
   left = 0
   rows = []
   skip = False
+  # ----- find x value at which rows are separated by a thin line -----
   for x in range(0, 50):
     if skip is True:
       skip = False
       continue
     rows = [height]
     vert_line_cnt = y = 0
+  # ----- vertical iteration, beginn at bottom, find y values of rows -----
     for y in range(height - 1, -1, -1):
       pixel_color = img[y, x]
       if DEV == 4 and pixel_color not in COLOR[WHITE]:
@@ -902,6 +907,7 @@ def png_grid_capture_rows(img):
           if DEV == 4:
             print(f'skip vertical thin line at {x =}')
           break
+  # ----- check break condition, continue if y > height threshold -----
       if y <= rows[-1] - (40 if y < height_thresh else 112):
         if DEV == 4:
           print(f'reached blank area at {y = }')
@@ -916,6 +922,7 @@ def png_grid_capture_rows(img):
     if y < height_thresh:
       left = x
       break
+  # ----- add 0 to rows if last found row value allows exactly one more row ---
   if 15 < rows[-1] <= 35:
     rows.append(0)
   if DEV == 1:
@@ -967,26 +974,28 @@ def png_grid_remove_invalid_rows(rows, x, img):
 # -------------------------------------
 
 # -------------------------------------
+def png_image_preprocessed_string(frame, not_planable):
+  ocr = pytesseract.image_to_string(frame, config='--psm 7').strip()
+  if not_planable:
+    for split_chars in SPLIT_CHARS:
+      ocr = ocr.rsplit(split_chars, maxsplit=1)[0]
+  return ocr.strip(STRIP_CHARS)
+# -------------------------------------
+
+# -------------------------------------
 def png_image_variations_yield_ocr_name(cv_data):
   orig_t, orig_b, orig_l, orig_r = cv_data[ROI]['orig']
   frame = cv_data[IMG][orig_t:orig_b, orig_l:orig_r]
   if np.mean(frame) < 245:
     for i in range(195, 208):
       frame[frame == i] = 255
-    ocr = image_to_string(frame, config='--psm 7').strip()
-    yield 'inverted', ocr
-    skip_vars = 2
+    yield 'inverted', png_image_preprocessed_string(frame, cv_data[NP])
+    start_n = 2
   else:
-    skip_vars = 0
-  for idx, (image, size_key) in enumerate(cv_data[IMG_VARIATIONS], 1):
-    if idx < skip_vars:
-      continue
-    top, bot, left, right = cv_data[ROI][size_key]
-    ocr = image_to_string(image[top:bot,left:right], config='--psm 7').strip()
-    if cv_data[NP]:
-      for split_chars in SPLIT_CHARS:
-        ocr = ocr.rsplit(split_chars, maxsplit=1)[0]
-    yield idx, ocr.strip(STRIP_CHARS)
+    start_n = 0
+  for idx, (image, size) in enumerate(cv_data[IMG_VARIATIONS][start_n:], 1):
+    top, bot, left, right = cv_data[ROI][size]
+    yield idx, png_image_preprocessed_string(image[top:bot,left:right], cv_data[NP])
 # -------------------------------------
 
 # -------------------------------------
@@ -1346,11 +1355,6 @@ def print_log(text='', pre='', end=''):
 # -------------------------------------
 
 # -------------------------------------
-def print_log_city_runtime(city, start, log):
-  return log + print_log_header(parse_city_runtime(city, start), suf='=')
-# -------------------------------------
-
-# -------------------------------------
 def print_log_header(text='', fil='=', pre='-', suf='-', brk=BR):
   if len(pre) == 1:
     pre = parse_break_line(pre) + NL
@@ -1395,8 +1399,8 @@ def print_progress_bar(bar_data, row_cnt, row_n):
 
 # -------------------------------------
 def processed_ocr_data_to_logfile(data, kw_dir, city):
-  writer = ExcelWriter(join(kw_dir, f'det_names_{city}_{START_DT}.xlsx'))
-  DataFrame(data, columns=DF_DET_COLUMNS).to_excel(writer, city, index=False)
+  writer = pd.ExcelWriter(join(kw_dir, f'det_names_{city}_{START_DT}.xlsx'))
+  pd.DataFrame(data, columns=DF_DET_COLS).to_excel(writer, city, index=False)
   worksheet = writer.sheets[city]
   worksheet.autofilter('A1:H1')
   worksheet.freeze_panes(1, 0)
@@ -1417,7 +1421,7 @@ def processed_xlsx_data_to_report_df(dfs):
     data.update(get_given_hour_ratios(data[AVA], data[GIV], data[MAX]))
     data.update(get_data_check_and_first_comment(data))
     data_list.append(data)
-  return DataFrame(data_list).set_index(RID_NAM, drop=False)
+  return pd.DataFrame(data_list).set_index(RID_NAM, drop=False)
 # -------------------------------------
 
 # -------------------------------------
@@ -1437,9 +1441,9 @@ def process_screenshots(ref_data, dirs, year, kw, city):
 # -------------------------------------
 
 # -------------------------------------
-def process_xlsx_data(dirs, city, kw_date, log):
-  log += print_log_header(PROCESS_XLSX_MSG)
-  dfs = load_xlsx_data_into_dfs(dirs, city, log)
+def process_xlsx_data(dirs, city, kw_date, dfs):
+  dfs[LOG] += print_log_header(PROCESS_XLSX_MSG)
+  dfs = load_xlsx_data_into_dfs(dirs, city, dfs)
   if dfs[AVA] is None:
     return dfs
   dfs = rider_ee_update_names(kw_date, city, dfs)
@@ -1562,7 +1566,7 @@ def rider_ee_pre_c_update(df_row, contract, kw_date):
 # -------------------------------------
 def rider_ee_to_formated_xlsx(city, ree_dir, df_ee):
   row_cnt = df_ee.shape[0] + 1
-  writer = ExcelWriter(parse_city_ee_filepath(city, ree_dir))
+  writer = pd.ExcelWriter(parse_city_ee_filepath(city, ree_dir))
   df_ee.to_excel(writer, city, index=False)
   workbook = writer.book
   worksheet = writer.sheets[city]
@@ -1666,24 +1670,29 @@ def screenshots_merge_daily_files(city, dirs):
 # -------------------------------------
 def shiftplan_check(city, year, kw, dirs, get_ava, merge, tidy_only, ee_only):
   start = time.perf_counter()
-  log = print_log_header(parse_sp_check_msg(city, year, kw))
-  log += tidy_screenshot_files(city, dirs, merge)
+  dfs = {LOG: print_log_header(parse_sp_check_msg(city, year, kw))}
+  dfs[LOG] += tidy_screenshot_files(city, dirs, merge)
   if tidy_only:
-    return print_log_city_runtime(city, start, log)
+    return shiftplan_check_log_city_runtime(city, start, dfs[LOG])
   kw_date = date.fromisocalendar(year, kw, 1)
-  dfs = process_xlsx_data(dirs, city, kw_date, log)
+  dfs = process_xlsx_data(dirs, city, kw_date, dfs)
   if dfs.get(AVA, None) is None:
-    return print_log_city_runtime(city, start, dfs[LOG])
+    return shiftplan_check_log_city_runtime(city, start, dfs[LOG])
   if get_ava and TESSERACT_AVAILABLE:
     data = process_screenshots(dfs[REF], dirs, year, kw, city)
     dfs = shiftplan_report_png_data_update(data, dfs, kw_date, city)
   if SAVE_REP:
     rider_ee_to_formated_xlsx(city, dirs[4], dfs[EE])
     if ee_only:
-      return print_log_city_runtime(city, start, dfs[LOG])
-    dfs[REP] = shiftplan_report_remove_irrelevant(dfs[REP])
+      return shiftplan_check_log_city_runtime(city, start, dfs[LOG])
+    dfs[REP] = shiftplan_report_remove_unnecessary(dfs[REP])
     dfs[LOG] += shiftplan_report_to_formated_xlsx(dfs[REP], city, kw)
-  return print_log_city_runtime(city, start, dfs[LOG])
+  return shiftplan_check_log_city_runtime(city, start, dfs[LOG])
+# -------------------------------------
+
+# -------------------------------------
+def shiftplan_check_log_city_runtime(city, start, log):
+  return log + print_log_header(parse_city_runtime(city, start), suf='=')
 # -------------------------------------
 
 # -------------------------------------
@@ -1692,7 +1701,9 @@ def shiftplan_report_png_data_update(data, dfs, kw_date, city):
   only_ee = []
   only_screen = []
   os_names = []
+  # ----- iterate through read data, update availabilities in report df -----
   for name, avails in data[AVA].items():
+  # ----- case 1: name is already in report df -----
     try:
       dfs[REP].at[name, AVAILS] = parse_availability_string(
         avails, data[HRS][name], data[XTR][name], dfs[REP].at[name, AVA]
@@ -1700,12 +1711,14 @@ def shiftplan_report_png_data_update(data, dfs, kw_date, city):
       if dfs[REP].at[name, AVA] == '':
         dfs[REP].at[name, AVA] = data[HRS][name]
     except KeyError:
+  # ----- case 2: name not in report df, but in Rider_Ersterfassung -----
       msg = f'rider "{name}" in screenshots but not in report dataframe'
       dfs[LOG] += msg + NL
       if DEV == 3:
         print(msg)
       if name in dfs[REF][3]:
         only_ee.append(rider_ee_new_df_entry(name, avails, data, dfs[REF]))
+  # ----- case 3: name neither in report df, nor in Rider_Ersterfassung -----
       else:
         only_ee.append(rider_ee_new_df_entry(name, avails, data, NO_DA))
         only_screen.append(rider_ee_new_xlsx_entry(city, name, NO_DA, kw_date))
@@ -1723,18 +1736,18 @@ def shiftplan_report_png_data_update(data, dfs, kw_date, city):
 # -------------------------------------
 
 # -------------------------------------
-def shiftplan_report_remove_irrelevant(df):
+def shiftplan_report_remove_unnecessary(df):
   return df[(df[AVA] != 0) | (df[AVAILS] != '') | (df[GIV_SHI] != '')]
 # -------------------------------------
 
 # -------------------------------------
-def shiftplan_report_to_formated_xlsx(df, city, kw):
+def shiftplan_report_to_formated_xlsx(df_report, city, kw):
   log = print_log_header(CREATE_XLSX_MSG)
-  row_cnt = len(df) + 1
+  row_cnt = len(df_report) + 1
   # ----- open instance of xlsx-file -----
   filename = f'{OUT_FILE_PRE}KW{kw}_{city}-{START_DT}.xlsx'
-  writer = ExcelWriter(join(OUTPUT_DIR, filename), engine='xlsxwriter')
-  df.to_excel(writer, 'Sheet1', index=False)
+  writer = pd.ExcelWriter(join(OUTPUT_DIR, filename), engine='xlsxwriter')
+  df_report.to_excel(writer, 'Sheet1', index=False)
   # ----- format xlsx file -----
   workbook = writer.book
   fmt_dict = {f_key: workbook.add_format(f) for f_key, f in FMT_DICT.items()}
@@ -1905,8 +1918,9 @@ def main(s_year, l_year, start_kw, l_kw, cities, *args):
         log += f'{type(ex)=} | {repr(ex)=}{NL}{parse_break_line("#")}'
         raise ex
       finally:
-        with open(join(log_dir, LOG_FN), 'w', encoding='utf-8') as logfile:
-          logfile.write(log)
+        if DEV == 0:
+          with open(join(log_dir, LOG_FN), 'w', encoding='utf-8') as logfile:
+            logfile.write(log)
   log += print_log_header(parse_run_end_msg(start), pre='=', suf='=', brk=NL)
 # -------------------------------------
 # =================================================================

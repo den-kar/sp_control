@@ -63,12 +63,12 @@ sp_control-master
 │   └── Rider_Ersterfassung_<STADTNAME>.xlsx           (je Stadt eine xlsx)
 ├── Schichtplan_bearbeitet    (wird autom. erstellt)
 │   └── KW<KALENDERWOCHE>_<STADTNAME>_<DATUMZEIT>.xlsx (je Stadt und KW eine xlsx)
-├── Schichtplan_Daten         (manuell erstellen)
+├── Schichtplan_Daten         (manuell erstellen, Unterordner ebenfalls)
 │   └── <JAHR>                (Ordner, Name ist 4-stellige Jahreszahl)
 │       └── KW<KALENDERWOCHE> (ein Ordner je Schichtplan Datenpaket)
 │           ├── .xlsx files   (Schichtplan, Verfügbarkeiten, Monatsstunden)
-│           └── .zip files    (Verfügbarkeiten Screenshots)
-├── config_report.json        (unter Linux optional, unter Windows "cmd_path" Parameter ausfüllen)
+│           └── screenhots    (Verfügbarkeiten Screenshots als zip, einzelne jpgs oder pngs)
+├── config_report.json        (eigene Städte unter "cities" eintragen, unter Windows zusätzlich "cmd_path" Parameter ausfüllen)
 ├── Rider_Ersterfassung.xlsx  (optional)
 └── sp_control.py
 ```

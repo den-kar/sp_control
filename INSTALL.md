@@ -100,9 +100,7 @@ sp_control-master
 1. Datei-Inhalt einfügen
 ```json
 {
-  "tesseract": {
-    "cmd_path": "C:\\Tesseract-ocr\\tesseract.exe"
-  },
+  "cmd_path": "C:\\Tesseract-ocr\\tesseract.exe",
   "cities": ["Frankfurt", "Offenbach"],
   "password": "",
   "aliases": {

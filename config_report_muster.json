@@ -1,7 +1,5 @@
 {
-  "tesseract": {
-    "cmd_path": "C:\\Tesseract-ocr\\tesseract.exe"
-  },
+  "cmd_path": "C:\\Tesseract-ocr\\tesseract.exe",
   "cities": ["Frankfurt", "Offenbach"],
   "password": "",
   "aliases": {
@@ -11,6 +9,8 @@
     "Nürnberg": ["nuernberg", "nuremberg", "nue"],
     "avail": ["verfügbarkeit", "availabilities", "verfuegbarkeiten"],
     "month": ["monatsstunden", "stunden", "hours", "hour report", "working hours"],
-    "shift": ["schichtplan", "schichtplanung", "working shifts", "planung", "shift report"]
+    "shift": [
+      "schichtplan", "schichtplanung", "working shifts", "planung", "shift report"
+    ]
   }
 }

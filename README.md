@@ -7,6 +7,24 @@ Tool zur Erstellung eines Schichtplan-Kontroll-Reports. **sp_control** wird von 
 Vollständige Anleitung [INSTALL.md](https://github.com/den-kar/sp_control/blob/master/INSTALL.md)
 
 ---
+### Schichtplan Arbeitsordner Struktur
+```md
+sp_control-master
+├── Rider_Ersterfassung       (wird autom. erstellt)
+│   └── Rider_Ersterfassung_<STADTNAME>.xlsx           (je Stadt eine xlsx)
+├── Schichtplan_bearbeitet    (wird autom. erstellt)
+│   └── KW<KALENDERWOCHE>_<STADTNAME>_<DATUMZEIT>.xlsx (je Stadt und KW eine xlsx)
+├── Schichtplan_Daten         (manuell erstellen, Unterordner ebenfalls)
+│   └── <JAHR>                (Ordner, Name ist 4-stellige Jahreszahl)
+│       └── KW<KALENDERWOCHE> (ein Ordner je Schichtplan Datenpaket)
+│           ├── .xlsx files   (Schichtplan, Verfügbarkeiten, Monatsstunden)
+│           └── screenhots    (Verfügbarkeiten Screenshots als zip, einzelne jpgs oder pngs)
+├── config_report.json        (eigene Städte unter "cities" eintragen, unter Windows zusätzlich "cmd_path" Parameter ausfüllen)
+├── Rider_Ersterfassung.xlsx  (optional)
+└── sp_control.py
+```
+
+---
 ### Anwendung
 
 **sp_control** wird von einem Terminal mit eingerichteter und aktivierter Python-Umgebung aus genutzt und bietet durch Eingabe von Parametern zuschaltbare Funktionen.
@@ -42,35 +60,38 @@ optional arguments:
   1. zum Datei Verzeichnis navigieren mit `cd ~/pfad/zu/sp_control-master`
 
 **Windows**
-  1. `Windows-Taste` drücken
-  1. `Anaconda Prompt` eingeben
-  1. mit `Enter` bestätigen
-  1. zum Datei Verzeichnis navigieren mit `cd <LAUFWERK>:\pfad\zu\sp_control-master`
+  1. _Anaconda Prompt_ öffnen
+  - `Windows-Taste` drücken
+  - `Anaconda Prompt` eingeben
+  - mit `Enter` bestätigen
 
-#### Beispielanwendungen
+  2. Python Umgebung aktivieren
+  - in _Anaconda Prompt_ `conda activate Takeaway` eingeben
+  - mit `Enter` bestätigen
 
-**Standard Wochenreport**
-  - Kalenderwoche 47, default Städte, Verfügbarkeiten auslesen
-> sp_control.py -kw 47 -a
-
-**Erstellung vollständiger `Rider_Ersterfassung_<STADTNAME>.xlsx` Datei**
-  - ab KW 1, bis KW 47, nur Frankfurt, ohne auslesen der Verfügbarkeiten
-> sp_control.py -kw 1 -l 47 -c Frankfurt
+  3. zum Datei Verzeichnis navigieren
+  - wenn man den Ordner im Explorer öffnet und in die Adresszeile klickt, kann man den benötigten Pfad einfach kopieren
+  - in _Anaconda Prompt_ eingeben `cd <Laufwerk>:\pfad\zu\sp_control-master`
+  - mit `Enter` bestätigen
 
 ---
-### Schichtplan Arbeitsordner Struktur
-```md
-sp_control-master
-├── Rider_Ersterfassung       (wird autom. erstellt)
-│   └── Rider_Ersterfassung_<STADTNAME>.xlsx           (je Stadt eine xlsx)
-├── Schichtplan_bearbeitet    (wird autom. erstellt)
-│   └── KW<KALENDERWOCHE>_<STADTNAME>_<DATUMZEIT>.xlsx (je Stadt und KW eine xlsx)
-├── Schichtplan_Daten         (manuell erstellen, Unterordner ebenfalls)
-│   └── <JAHR>                (Ordner, Name ist 4-stellige Jahreszahl)
-│       └── KW<KALENDERWOCHE> (ein Ordner je Schichtplan Datenpaket)
-│           ├── .xlsx files   (Schichtplan, Verfügbarkeiten, Monatsstunden)
-│           └── screenhots    (Verfügbarkeiten Screenshots als zip, einzelne jpgs oder pngs)
-├── config_report.json        (eigene Städte unter "cities" eintragen, unter Windows zusätzlich "cmd_path" Parameter ausfüllen)
-├── Rider_Ersterfassung.xlsx  (optional)
-└── sp_control.py
-```
+### Beispielanwedungen
+
+**Standard Wochenreport mit Daten Visualisierung**
+  - Jahr 2020, Kalenderwoche 47, Stadt Frankfurt, Verfügbarkeiten auslesen, Schichten visualisieren
+  - Report Output Pfad `Schichtplan_bearbeitet/`
+    - Dateiname `KW47_Frankfurt_<ERSTELLUNGSDATUM>.xlsx`
+  - Plots Output Pfad `Schichtplan_Daten/2020/KW47/Analyse`
+    - Dateiname `Frankfurt_KW47_[1_Montag - 7_Sonntag].png`
+> sp_control.py -y 2020 -kw 47 -a -v -c Frankfurt
+
+**Erstellung vollständiger `Rider_Ersterfassung_<STADTNAME>.xlsx` Datei**
+  - ab KW 1, bis KW 53, default Städte, speichert nur Ersterfassung Datei -> keine Schichtplan-Reports, ohne auslesen der Verfügbarkeiten
+  - Default Städte können in der `config_report.json` auf die eigene Region angepasst werden, der Standard Wert ist ["Frankfurt", "Offenbach"]
+  - Ersterfassung Datei Pfad `Rider_Ersterfassung/`
+    - Dateiname
+      - `Rider_Ersterkennung_Frankfurt.xlsx`
+      - `Rider_Ersterkennung_Offenbach.xlsx`
+  - weitere Parameter nach Bedarf zuschaltbar (z.B. -v für Daten Visualisierung)
+> sp_control.py -kw 1 -lkw 53 -eeo
+

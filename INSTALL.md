@@ -41,7 +41,7 @@ Wenn im Terminal die aktive Zeile mit `(Takeaway)` anfängt, ist die Umgebung ak
 
 #### 2.2 site-packages installieren
 In Terminal mit aktivierter Python Umgeben eingeben
-> conda install -c conda-forge pandas pillow xlrd xlsxwriter opencv fuzzywuzzy pytesseract -y
+> conda install -c conda-forge pandas pillow xlrd xlsxwriter opencv fuzzywuzzy pytesseract matplotlib -y
 
 Anschließend im selben Terminal eingeben
 > pip install msoffcrypto-tool
@@ -188,17 +188,38 @@ optional arguments:
   1. zum Datei Verzeichnis navigieren mit `cd ~/pfad/zu/sp_control-master`
 
 **Windows**
-  1. `Windows-Taste` drücken
-  1. `Anaconda Prompt` eingeben
-  1. mit `Enter` bestätigen
-  1. zum Datei Verzeichnis navigieren mit `cd <LAUFWERK>:\pfad\zu\sp_control-master`
+  1. _Anaconda Prompt_ öffnen
+  - `Windows-Taste` drücken
+  - `Anaconda Prompt` eingeben
+  - mit `Enter` bestätigen
 
-#### Beispielanwendungen
+  2. Python Umgebung aktivieren
+  - in _Anaconda Prompt_ `conda activate Takeaway` eingeben
+  - mit `Enter` bestätigen
 
-**Kompletter Report `KW<KALENDERWOCHE>_<STADTNAME><YYYY_mm_dd_HH_MM_SS>.xlsx`**
-  - Jahr 2020, Kalenderwoche 47, default Städte, Verfügbarkeiten auslesen
-> sp_control.py -y 2020 -kw 47 -a
+  3. zum Datei Verzeichnis navigieren
+  - wenn man den Ordner im Explorer öffnet und in die Adresszeile klickt, kann man den benötigten Pfad einfach kopieren
+  - in _Anaconda Prompt_ eingeben `cd <Laufwerk>:\pfad\zu\sp_control-master`
+  - mit `Enter` bestätigen
+
+---
+### Beispielanwedungen
+
+**Standard Wochenreport mit Daten Visualisierung**
+  - Jahr 2020, Kalenderwoche 47, Stadt Frankfurt, Verfügbarkeiten auslesen, Schichten visualisieren
+  - Report Output Pfad `Schichtplan_bearbeitet/`
+    - Dateiname `KW47_Frankfurt_<ERSTELLUNGSDATUM>.xlsx`
+  - Plots Output Pfad `Schichtplan_Daten/2020/KW47/Analyse`
+    - Dateiname `Frankfurt_KW47_[1_Montag - 7_Sonntag].png`
+> sp_control.py -y 2020 -kw 47 -a -v -c Frankfurt
 
 **Erstellung vollständiger `Rider_Ersterfassung_<STADTNAME>.xlsx` Datei**
-  - ab KW 1, bis KW 53, nur Frankfurt, speichert nur Ersterfassung Datei -> keine Schichtplan-Reports, ohne auslesen der Verfügbarkeiten
-> sp_control.py -kw 1 -lkw 53 -c Frankfurt -eeo
+  - ab KW 1, bis KW 53, default Städte, speichert nur Ersterfassung Datei -> keine Schichtplan-Reports, ohne auslesen der Verfügbarkeiten
+  - Default Städte können in der `config_report.json` auf die eigene Region angepasst werden, der Standard Wert ist ["Frankfurt", "Offenbach"]
+  - Ersterfassung Datei Pfad `Rider_Ersterfassung/`
+    - Dateiname
+      - `Rider_Ersterkennung_Frankfurt.xlsx`
+      - `Rider_Ersterkennung_Offenbach.xlsx`
+  - weitere Parameter nach Bedarf zuschaltbar (z.B. -v für Daten Visualisierung)
+> sp_control.py -kw 1 -lkw 53 -eeo
+

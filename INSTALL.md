@@ -177,6 +177,8 @@ optional arguments:
   -m, --mergeperday     Erstellt je Stadt und Tag eine zusammegesetzte Verfügbarkeiten-Screenshot-Datei
   -eeo, --ersterkennung_only
                         Erstellt nur die Rider_Ersterkennung Datei, ohne SP-Report
+  -v, --visualize_shifts
+                        Daten Visualisierung, erstellt Plots der vergebenen Schichten
 ```
 
 #### Terminal mit Python Umgebung öffnen und zum Arbeitsorder navigieren

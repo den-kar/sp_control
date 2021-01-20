@@ -5,6 +5,8 @@
 from collections import defaultdict
 import copy
 from datetime import date, datetime, timedelta
+import getpass
+import io
 import os
 from os.path import abspath, basename, dirname, exists, join
 import shutil
@@ -14,6 +16,8 @@ import time
 # -------------------------------------
 import cv2 as cv
 from fuzzywuzzy import fuzz
+import matplotlib.pyplot as plt
+import msoffcrypto
 import numpy as np
 import pandas as pd
 from pytesseract import pytesseract
@@ -157,6 +161,7 @@ NU = 'num'
 NU_FO = 'num_format'
 PAI = 'paid'
 PAI_MAX = 'paid/max'
+PLOT_SHIFTS_MSG = 'PLOT DISTRIBUTED SHIFTS'
 PNG = 'png'
 PNGS = 'available_png_list'
 PNG_CNT = 'png_count'
@@ -181,6 +186,7 @@ P_M = (
   'Verfügbarkeiten-Screenshot-Datei'
 )
 P_TO = 'Räumt alle Verfügbarkeiten Screenshot Dateien auf'
+P_V = 'Daten Visualisierung, erstellt Plots der vergebenen Schichten'
 P_Y = 'Jahr der zu prüfenden Daten, default: heutiges Jahr'
 REDUCE_HOURS = ' -> auf Min.Std. reduzieren'
 REF = 'reference_data'
@@ -199,6 +205,7 @@ SHI = 'shift'
 SIC = 'sick'
 SIM_NAM = 'similar names'
 SH_DA = 'Shift Date'
+SH_DAY = 'Shift Day'
 STD_REP = 'stundenreports'
 STORE_TRUE = 'store_true'
 STRIP_CHARS = """ .,-_'`"()|"""
@@ -278,6 +285,9 @@ WEEKDAYS = (
   'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'
   , 'Sonntag'
 )
+WEEKDAYS_EN = (
+  'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+)
 DAYS = WEEKDAYS
 WEEKDAY_ABREVATIONS = (
   ('mo', 'mon'), ('di', 'tue'), ('mi', 'wed'), ('do', 'thu'), ('fr', 'fri')
@@ -316,27 +326,37 @@ _mini_min_h = int(60 / 13) / 2
 CON_BY_N = defaultdict(
   lambda: (NO_DA, NO_DA), {
     'Arbeitnehmerüberlassung': (0, 20)
-    , 'Foodora_Midijob': (12, 40)
     , 'Foodora_Minijob': (_mini_min_h, 15)
-    , 'Foodora_Working Student': (12, 20)
-    , 'Midijob': (12, 40)
     , 'Minijob': (_mini_min_h, 15)
     , 'Minijobber': (5, 11)
     , 'Mini-Jobber': (5, 11)
-    , 'TE Midijob': (12, 28)
     , 'TE Minijob': (5, 11)
-    , 'TE Teilzeit': (30, 48)
-    , 'TE Werkstudent': (12, 20)
-    , 'TE WS': (12, 20)
-    , 'Teilzeit': (30, 48)
-    , 'Vollzeit': (30, 48)
+    , 'Foodora_Working Student': (12, 20)
     , 'Werk Student': (12, 20)
     , 'Working Student': (12, 20)
     , 'Working-Student': (12, 20)
+    , 'TE Werkstudent': (12, 20)
+    , 'TE WS': (12, 20)
+    , 'TE Midijob': (12, 28)
+    , 'Foodora_Midijob': (12, 40)
+    , 'Midijob': (12, 40)
+    , 'TE Teilzeit': (30, 48)
+    , 'Teilzeit': (30, 48)
+    , 'Vollzeit': (30, 48)
   }
 )
 EXTRA_HOURS_BEGIN = defaultdict(int, {21: 1, 22: .5})
 EXTRA_HOURS_END = {21: 1, 22: 1, 23: 1, 24: .5, 25: 0, 26: 0}
+LGD_ARGS = {
+  'bbox_to_anchor': (.5, 1.05)
+  , 'loc': 'upper center'
+  , 'fontsize': 'small'
+  , 'facecolor': '#e5e5e5'
+}
+LGD_COLORS = dict(zip(
+  CON_BY_N.keys()
+  , plt.get_cmap('RdYlGn')(np.linspace(1, 0, len(CON_BY_N)))
+))
 PNG_PROCESSING_DICT = {
   AVA: defaultdict(list)
   , DONE: defaultdict(set)
@@ -353,6 +373,8 @@ TIMES = {
   , 25: TIMEBLOCK_STRINGS
   , 26: TIMEBLOCK_STRINGS
 }
+TITLE_FMT = {'fontsize': 20, 'fontweight': 'bold'}
+TOTAL_FMT = {'fontsize': 'large', 'fontweight': 'bold', 'color': 'black'}
 # -------------------------------------
 
 # -------------------------------------
@@ -468,8 +490,8 @@ else:
 # ### HANDLER FOR KEYBOARD INTERRUPT ###
 # -------------------------------------
 def keyboard_interrupt_handler(signal, frame):
-  print(f'{NL}KeyboardInterrupt (ID: {signal}) has been caught. Cleaning up..')
-  sys.exit(0)
+  print(f'{NL}KeyboardInterrupt has been caught. Close and clean up ...')
+  sys.exit(signal)
 # -------------------------------------
 signal.signal(signal.SIGINT, keyboard_interrupt_handler)
 # -------------------------------------
@@ -669,9 +691,6 @@ def load_avail_xlsx_into_df(df):
 
 # -------------------------------------
 def load_decrpyted_xlsx(file_path):
-  import getpass
-  import io
-  import msoffcrypto
   global PW
   df = None
   print('file is encrypted... decrypting')
@@ -731,7 +750,7 @@ def load_shift_xlsx_into_df(df):
   except (TypeError, ValueError):
     df[FR_HO] = pd.to_datetime(df[FR_HO], format=HMS).dt.time
     df[TO_HO] = pd.to_datetime(df[TO_HO], format=HMS).dt.time
-  return df.sort_values([DRI, SH_DA, FR_HO]).set_index(DR_ID, drop=False)
+  return df.sort_values([DRI, SH_DA, FR_HO]).set_index(SH_DAY, drop=False)
 # -------------------------------------
 
 # -------------------------------------
@@ -802,6 +821,11 @@ def parse_date(day_str, kw_dates):
 # -------------------------------------
 
 # -------------------------------------
+def parse_plot_title(city, year, kw, date_str, day):
+  return f'Verteilte Schichten {city} KW {kw}/{year}, {date_str} {day}'
+# -------------------------------------
+
+# -------------------------------------
 def parse_progress_bar(bar_len, prog, pre, suf):
   done = int(bar_len * prog)
   return f'{pre} [{"#" * done + "-" * (bar_len - done)}] {prog:.2%} {suf}'
@@ -827,6 +851,114 @@ def parse_stats_msg(counter):
     f'| T | no availabilites     : {counter[NOAV]:4d}{NL}'
     f'| S | not readable         : {counter[NOOCR]:4d}'
   )
+# -------------------------------------
+
+# -------------------------------------
+def plot_data_day_update(data, labels):
+  day_labels = copy.deepcopy(labels)
+  data = np.array([list(time_data.values()) for time_data in data.values()])
+  for cntr, cnt in zip(range(len(labels) - 1, -1, -1), np.sum(data, 0)[::-1]):
+    if int(cnt) == 0:
+      data = np.delete(data, cntr, 1)
+      del day_labels[cntr]
+  return data, np.cumsum(data, axis=1), day_labels
+# -------------------------------------
+
+# -------------------------------------
+def plot_initial_data_dict(dfs, labels, times):
+  data_dict = {}
+  times_set = {*times}
+  for day in WEEKDAYS_EN:
+    data_dict[day] = {}
+    for time in times:
+      data_dict[day][time] = {}
+      for contract in labels:
+        data_dict[day][time][contract] = 0
+  for day, df_row in dfs[SHI].iterrows():
+    try:
+      contract = dfs[REP].at[df_row[DRI], CON_TYP]
+    except KeyError:
+      continue
+    start_time = datetime.combine(_now, df_row[FR_HO])
+    end_time = datetime.combine(_now, df_row[TO_HO])
+    for dt_obj in pd.date_range(start_time, end_time, freq='30min'):
+      time = dt_obj.strftime('%H:%M')
+      if time in times_set:
+        data_dict[day][time][contract] += 1
+  return data_dict
+# -------------------------------------
+
+# -------------------------------------
+def plot_init_subplot(city, year, kw, date_str, day):
+  _, ax = plt.subplots(figsize=(18, 9))
+  ax.invert_yaxis()
+  ax.get_xaxis().set_visible(False)
+  ax.set_facecolor('#e5e5e5')
+  plot_title = parse_plot_title(city, year, kw, date_str, day)
+  ax.set_title(plot_title, fontdict=TITLE_FMT, pad=35)
+  return ax
+# -------------------------------------
+
+# -------------------------------------
+def plot_partial_bar_count(ax, color, widths, xcenters):
+  text_color = 'white' if np.average(color[:3]) < .5 else 'black'
+  for y, (xt, ct) in enumerate(zip(xcenters, widths)):
+    if ct == 0:
+      continue
+    ax.text(xt, y, str(int(ct)), ha=CEN, va=CEN, color=text_color)
+  return ax
+# -------------------------------------
+
+# -------------------------------------
+def plot_shift_distribution(dfs, city, year, kw, kw_dir):
+  log = print_log_header(PLOT_SHIFTS_MSG)
+  ana_dir = check_make_dir(kw_dir, 'Analyse')
+  contracts = dfs[REP][CON_TYP].unique()
+  dts = [date.fromisocalendar(year, kw, i).strftime(DMY) for i in range(1, 8)]
+  labels = [cont for ref_c in CON_BY_N for cont in contracts if cont == ref_c]
+  times = TIMES[22][:-1]
+  data_dict = plot_initial_data_dict(dfs, labels, times)
+  for idx, data in enumerate(data_dict.values()):
+    data, data_cumsum, day_labels = plot_data_day_update(data, labels)
+    if data_cumsum.shape[1] == 0:
+      continue
+    day_DE = WEEKDAYS[idx]
+    target_fn = f'{city}_KW{kw}_{idx + 1}_{day_DE}.png'
+    totals = data_cumsum[:, -1]
+    peak_cnt = totals.max()
+    ax = plot_init_subplot(city, year, kw, dts[idx], day_DE)
+    ax = plot_stacked_bars(ax, data, data_cumsum, day_labels, times)
+    ax = plot_total_bar_counts(ax, totals)
+    ax.legend(day_labels, ncol=len(day_labels), **LGD_ARGS)
+    plt.xlim(0, max(peak_cnt + 1, min(peak_cnt * 1.08, peak_cnt + 5)))
+    plt.tight_layout()
+    plt.savefig(join(ana_dir, target_fn))
+    plt.close()
+    log += print_log(f'{TAB} - saved plot = "{target_fn}"')
+  log += print_log('-----')
+  return log
+# -------------------------------------
+
+# -------------------------------------
+def plot_stacked_bars(ax, data, data_cumsum, labels, times):
+  for i, label in enumerate(labels):
+    color = LGD_COLORS[label]
+    widths = data[:, i]
+    starts = data_cumsum[:, i] - widths
+    xcenters = starts + widths / 2
+    ax.barh(times, widths, left=starts, height=.7, color=color, label=label)
+    ax = plot_partial_bar_count(ax, color, widths, xcenters)
+  return ax
+# -------------------------------------
+
+# -------------------------------------
+def plot_total_bar_counts(ax, totals):
+  for i in range(len(totals)):
+    tot = int(totals[i])
+    if tot == 0:
+      continue
+    ax.text(tot + .5, i, tot, ha=LEF, va=CEN, fontdict=TOTAL_FMT)
+  return ax
 # -------------------------------------
 
 # -------------------------------------
@@ -1668,15 +1800,20 @@ def screenshots_merge_daily_files(city, dirs):
 # -------------------------------------
 
 # -------------------------------------
-def shiftplan_check(city, year, kw, dirs, get_ava, merge, tidy_only, ee_only):
+def shiftplan_check(city, year, kw, dirs, run_args):
   start = time.perf_counter()
-  dfs = {LOG: print_log_header(parse_sp_check_msg(city, year, kw))}
+  get_ava, merge, tidy_only, ee_only, visualize = run_args
+  pre = '=' * os.get_terminal_size().columns + NL
+  dfs = {LOG: print_log_header(parse_sp_check_msg(city, year, kw), pre=pre)}
   dfs[LOG] += tidy_screenshot_files(city, dirs, merge)
   if tidy_only:
     return shiftplan_check_log_city_runtime(city, start, dfs[LOG])
   kw_date = date.fromisocalendar(year, kw, 1)
   dfs = process_xlsx_data(dirs, city, kw_date, dfs)
   if dfs.get(AVA, None) is None:
+    return shiftplan_check_log_city_runtime(city, start, dfs[LOG])
+  if visualize and dfs.get(REP, None) is not None:
+    dfs[LOG] += plot_shift_distribution(dfs, city, year, kw, dirs[0])
     return shiftplan_check_log_city_runtime(city, start, dfs[LOG])
   if get_ava and TESSERACT_AVAILABLE:
     data = process_screenshots(dfs[REF], dirs, year, kw, city)
@@ -1889,7 +2026,7 @@ def tidy_zip_files(city, dirs):
 # ### MAIN FUNCTION ###
 # =================================================================
 # -------------------------------------
-def main(s_year, l_year, start_kw, l_kw, cities, *args):
+def main(s_year, l_year, start_kw, l_kw, cities, *run_args):
   start = time.perf_counter()
   log = ''
   print_log_header(INITIAL_MSG, pre='=', suf='=')
@@ -1913,7 +2050,7 @@ def main(s_year, l_year, start_kw, l_kw, cities, *args):
         for city in cities:
           png_dir = check_make_dir(screen_dir, city)
           dirs = (kw_dir, log_dir, screen_dir, png_dir, ree_dir)
-          log += shiftplan_check(city, year, kw, dirs, *args)
+          log += shiftplan_check(city, year, kw, dirs, run_args)
       except Exception as ex:
         log += f'{type(ex)=} | {repr(ex)=}{NL}{parse_break_line("#")}'
         raise ex
@@ -1942,19 +2079,20 @@ if __name__ == '__main__':
   parser.add_argument('-m', '--mergeperday', action=STORE_TRUE, help=P_M)
   parser.add_argument('-to', '--tidy_only', action=STORE_TRUE, help=P_TO)
   parser.add_argument('-eeo','--ersterfassung',  action=STORE_TRUE, help=P_EEO)
+  parser.add_argument('-v', '--visualize_shifts', action=STORE_TRUE, help=P_V)
   parser.add_argument('-dev','--devmode',  type=int, default=0)
   parser.add_argument('-eiv','--ext_img_variations',  action='store_true')
   parser.add_argument('-d', '--days', nargs='*', default=WEEKDAYS)
   parser.add_argument('-idx', '--file_idx', default=None)
   parser.add_argument('-r', '--row_idx', type=int, default=0)
   parser.add_argument('-lr', '--last_row', type=int, default=0)
-  parser.add_argument('-nr','--no_reports',  action='store_false')
-  parser = parser.parse_args().__dict__
+  parser.add_argument('-rep','--store_reports',  action='store_true')
+  arg_dict = parser.parse_args().__dict__
   print(' RUN PARAMETER '.center(80, '='))
-  for key, value in parser.items():
+  for key, value in arg_dict.items():
     print(f':::::   {key}:{(28 - len(key)) * " "}{value}')
   print(''.center(80, '.'))
-  *args, DEV, EIV, DAYS, FIDX, ROW, ENDROW, SAVE_REP = parser.values()
+  *args, DEV, EIV, DAYS, FIDX, ROW, ENDROW, SAVE_REP = arg_dict.values()
   if DEV >= 1:
     SAVE_REP = False
     print(''.center(80, '-'))

@@ -79,29 +79,32 @@ usage: sp_control.py [-h] [-y START_YEAR] [-z LAST_YEAR] [-k START_KW] [-l LAST_
 ---
 ### Beispielanwedungen
 
-**Standard Wochenreport mit Daten Visualisierung**
-  - KW 47 / 2020
-  - Stadt Frankfurt
+#### Standard Wochenreport mit Daten Visualisierung für default Städte
+> sp_control.py -a -v
+  - liest Daten der folgenden KW vom Zeitpunkt der Ausführung
+  - default Städte
+    - default Städte können in der `config_report.json` auf die eigene Region angepasst werden, der Standard Wert ist ["Frankfurt", "Offenbach"]
   - Verfügbarkeiten auslesen
   - Schichten visualisieren
   - Report Output Pfad `Schichtplan_bearbeitet/`
-    - Dateiname `KW47_Frankfurt_<ERSTELLUNGSDATUM>.xlsx`
-  - Plots Output Pfad `Schichtplan_Daten/2020/KW47/Analyse`
-    - Dateiname `Frankfurt_KW47_[1_Montag - 7_Sonntag].png`
-> sp_control.py -y 2020 -kw 47 -a -v -c Frankfurt
+  - Beispiel Report Dateinamen 
+     - `KW4_Frankfurt_2021_01_21_17_56_51.xlsx`
+     - `KW4_Offenbach_2021_01_21_17_56_51.xlsx`
+  - Beispiel Plots Output Pfad `Schichtplan_Daten/2021/KW4/Analyse/`
+  - Beispiel Plot Output Dateinamen
+    - `Frankfurt_[2021-01-25 - 2021-01-31].png` (je Tag eine Datei)
+    - `Offenbach_[2021-01-25 - 2021-01-31].png` (je Tag eine Datei)
 
-**Erstellung vollständiger `Rider_Ersterfassung_<STADTNAME>.xlsx` Datei**
+#### Erstellung vollständiger `Rider_Ersterfassung_<STADTNAME>.xlsx` Datei
+> sp_control.py -y 2019 -k 29 -z 2021 -l 4 -e -c Frankfurt
   - ab KW 1 / 2019
   - bis KW 4 / 2021
-  - default Städte
+  - Stadt Frankfurt
   - speichert nur Ersterfassung Datei 
     - keine Schichtplan-Reports
     - ohne auslesen der Verfügbarkeiten
-  - default Städte können in der `config_report.json` auf die eigene Region angepasst werden, der Standard Wert ist ["Frankfurt", "Offenbach"]
   - Ersterfassung Datei Pfad `Rider_Ersterfassung/`
-    - Dateiname
-      - `Rider_Ersterkennung_Frankfurt.xlsx`
-      - `Rider_Ersterkennung_Offenbach.xlsx`
+  - Ersterfassung Dateiname
+    - `Rider_Ersterkennung_Frankfurt.xlsx`
   - weitere Parameter nach Bedarf zuschaltbar (z.B. -v für Daten Visualisierung)
-> sp_control.py -y 2019 -k 29 -z 2021 -l 4 -e
 

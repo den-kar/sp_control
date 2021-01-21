@@ -43,6 +43,7 @@ MD = '%m-%d'
 YMD = '%Y-%m-%d'
 Y_S = '%Y_%m_%d_%H_%M_%S'
 _now = datetime.now()
+KW = _now.isocalendar()[1] + 1
 START_DT = _now.strftime(Y_S)
 TOO_OLD = timedelta(weeks=8)
 WEEK_GAP = timedelta(weeks=1)
@@ -250,7 +251,9 @@ OUTPUT_DIR = join(BASE_DIR, 'Schichtplan_bearbeitet')
 if not exists(OUTPUT_DIR):
   os.makedirs(OUTPUT_DIR)
 OUT_FILE_PRE = 'DEV'
-SPD_DIR = join(BASE_DIR, 'Schichtplan_Daten', str(YEAR))
+REE_DIR = join(BASE_DIR, EE)
+if not exists(OUTPUT_DIR):
+  os.makedirs(OUTPUT_DIR)
 # -------------------------------------
 
 # -------------------------------------
@@ -717,9 +720,9 @@ def load_decrpyted_xlsx(file_path):
 # -------------------------------------
 
 # -------------------------------------
-def load_ersterfassung_xlsx_into_df(city, ree_dir):
+def load_ersterfassung_xlsx_into_df(city):
   try:
-    df = pd.read_excel(parse_city_ee_filepath(city, ree_dir))
+    df = pd.read_excel(parse_city_ee_filepath(city))
   except FileNotFoundError:
     try:
       df = pd.read_excel(EE_BACKUP, city)
@@ -784,7 +787,7 @@ def load_xlsx_data_into_dfs(dirs, city, dfs):
     dfs[AVA] = None
     dfs[LOG] += print_log_header(f'{MISSING_FILE_MSG}{mendatory}', '#', '', '')
   else:
-    dfs[EE] = load_ersterfassung_xlsx_into_df(city, dirs[4])
+    dfs[EE] = load_ersterfassung_xlsx_into_df(city)
   return dfs
 # -------------------------------------
 
@@ -806,8 +809,8 @@ def parse_break_line(fil='=', text=''):
 # -------------------------------------
 
 # -------------------------------------
-def parse_city_ee_filepath(city, ree_dir):
-  return join(ree_dir, f'{EE}_{city}.xlsx')
+def parse_city_ee_filepath(city):
+  return join(REE_DIR, f'{EE}_{city}.xlsx')
 # -------------------------------------
 
 # -------------------------------------
@@ -838,7 +841,7 @@ def parse_run_end_msg(start):
 # -------------------------------------
 
 # -------------------------------------
-def parse_sp_check_msg(city, year, kw):
+def parse_sp_check_msg(city, kw, year):
   return f'{CITY_LOG_PRE} {city} | KW {kw} / {year}'
 # -------------------------------------
 
@@ -910,7 +913,7 @@ def plot_partial_bar_count(ax, color, widths, xcenters):
 # -------------------------------------
 
 # -------------------------------------
-def plot_shift_distribution(dfs, city, year, kw, kw_dir):
+def plot_shift_distribution(dfs, city, kw, year, kw_dir):
   log = print_log_header(PLOT_SHIFTS_MSG)
   ana_dir = check_make_dir(kw_dir, 'Analyse')
   contracts = dfs[REP][CON_TYP].unique()
@@ -918,8 +921,8 @@ def plot_shift_distribution(dfs, city, year, kw, kw_dir):
   labels = [cont for ref_c in CON_BY_N for cont in contracts if cont == ref_c]
   times = TIMES[22][:-1]
   data_dict = plot_initial_data_dict(dfs, labels, times)
-  for idx, data in enumerate(data_dict.values()):
-    data, data_cumsum, day_labels = plot_data_day_update(data, labels)
+  for idx, day_dict in enumerate(data_dict.values()):
+    data, data_cumsum, day_labels = plot_data_day_update(day_dict, labels)
     if data_cumsum.shape[1] == 0:
       continue
     day_DE = WEEKDAYS[idx]
@@ -1106,7 +1109,7 @@ def png_grid_remove_invalid_rows(rows, x, img):
 # -------------------------------------
 
 # -------------------------------------
-def png_image_preprocessed_string(frame, not_planable):
+def png_image_prep_ocr_string(frame, not_planable):
   ocr = pytesseract.image_to_string(frame, config='--psm 7').strip()
   if not_planable:
     for split_chars in SPLIT_CHARS:
@@ -1121,13 +1124,13 @@ def png_image_variations_yield_ocr_name(cv_data):
   if np.mean(frame) < 245:
     for i in range(195, 208):
       frame[frame == i] = 255
-    yield 'inverted', png_image_preprocessed_string(frame, cv_data[NP])
+    yield png_image_prep_ocr_string(frame, cv_data[NP])
     start_n = 2
   else:
     start_n = 0
   for idx, (image, size) in enumerate(cv_data[IMG_VARIATIONS][start_n:], 1):
     top, bot, left, right = cv_data[ROI][size]
-    yield idx, png_image_preprocessed_string(image[top:bot,left:right], cv_data[NP])
+    yield idx, png_image_prep_ocr_string(image[top:bot,left:right], cv_data[NP])
 # -------------------------------------
 
 # -------------------------------------
@@ -1243,11 +1246,11 @@ def png_name_score_check(scores, img_n, min_total_perc, leading_factor=1.35):
 
 # -------------------------------------
 def png_name_similarity_check(hit, ocr_name, simil_names):
+  highest = 0
   if any(fuzz.WRatio(hit, name) == 100 for name in simil_names):
     method = 'ratio'
   else:
     method = 'WRatio'
-  highest = 0
   for name in (hit, *simil_names):
     similarity = getattr(fuzz, method)(ocr_name, name)
     if similarity > 95:
@@ -1344,13 +1347,7 @@ def png_values_cv_data(rows, row_cnt, left, first_col, img):
   res_width = int(resize_factor * right)
   res_height = int(resize_factor * img.shape[0])
   res_img = cv.resize(img[:, left:right], (res_width, res_height))
-  img_variations = (
-    (cv.threshold(res_img, 220, 255, cv.THRESH_BINARY)[1], 'resize')
-    , (CLAHE_DEF.apply(res_img), 'resize')
-    , (cv.threshold(res_img, 212, 255, cv.THRESH_BINARY)[1], 'resize')
-    , (cv.filter2D(res_img, -1, KERNEL_SHARP), 'resize')
-    , (CLAHE_L3_S7.apply(res_img), 'resize')
-  )
+  img_variations = png_values_get_image_variations(res_img)
   if EIV:
     img_variations += png_values_extend_image_variations(img, res_img)
   if DEV == 1:
@@ -1369,6 +1366,17 @@ def png_values_cv_data(rows, row_cnt, left, first_col, img):
     , ROI: {'orig': [0, 0, left, right], 'resize': [0, 0, 0, res_width]}
     , VALID: png_values_get_min_valid_perc(row_height)
   }
+# -------------------------------------
+
+# -------------------------------------
+def png_values_get_image_variations(res_img):
+  return (
+    (cv.threshold(res_img, 220, 255, cv.THRESH_BINARY)[1], 'resize')
+    , (CLAHE_DEF.apply(res_img), 'resize')
+    , (cv.threshold(res_img, 212, 255, cv.THRESH_BINARY)[1], 'resize')
+    , (cv.filter2D(res_img, -1, KERNEL_SHARP), 'resize')
+    , (CLAHE_L3_S7.apply(res_img), 'resize')
+  )
 # -------------------------------------
 
 # -------------------------------------
@@ -1399,7 +1407,7 @@ def png_values_get_min_valid_perc(height):
 # -------------------------------------
 
 # -------------------------------------
-def png_values_image(date_str, img, ref_data):
+def png_values_image_values(date_str, img, ref_data):
   rows, left = png_grid_capture_rows(img)
   cols, col_cnt, x_valid = png_grid_capture_cols(rows, left, img)
   if x_valid is None:
@@ -1421,40 +1429,46 @@ def png_values_image(date_str, img, ref_data):
 # -------------------------------------
 
 # -------------------------------------
-def png_values_yield_images(ref_data, png_dir, year, kw, city):
-  kw_dates = [str(date.fromisocalendar(year, kw, i)) for i in range(1, 8)]
-  pngs = sorted(os.listdir(png_dir))
+def png_values_imread(png, png_dir):
+  image = cv.imread(join(png_dir, png), cv.IMREAD_GRAYSCALE)
+  if image is None:
+    shutil.copy(join(png_dir, png), png)
+    image = cv.imread(png, cv.IMREAD_GRAYSCALE)
+    os.remove(png)
+  return image
+# -------------------------------------
+
+# -------------------------------------
+def png_values_sort_key(png):
+  day, idx_str = png.split('.')[0].split('_')
+  return WEEKDAYS.index(day), int(idx_str)
+# -------------------------------------
+
+# -------------------------------------
+def png_values_yield_pngs(ref_data, city, kw, year, png_dir):
   image_vals = {}
-  for png_n, png in enumerate(pngs):
-    png_split = png.split('_')
-    if len(png_split) != 2:
-      continue
-    day, file_suf = png_split
-    file_idx = file_suf.split('.')[0]
-    date_str = parse_date(day, kw_dates)
-    if (day not in DAYS) or ((FIDX is not None) and (file_idx != FIDX)):
-      continue
-    img = cv.imread(join(png_dir, png), cv.IMREAD_GRAYSCALE)
-    if img is None:
-      shutil.copy(join(png_dir, png), png)
-      img = cv.imread(png, cv.IMREAD_GRAYSCALE)
-      os.remove(png)
+  kw_dates = [str(date.fromisocalendar(year, kw, i)) for i in range(1, 8)]
+  pngs = os.listdir(png_dir)
+  for png_n, png in enumerate(sorted(pngs, key=png_values_sort_key)):
     if DEV >= 1:
       print(f'{png=}'.center(80, '='))
-    image_vals = png_values_image(date_str, img, ref_data)
+    day, file_suf = png.split('_')
+    date_str = parse_date(day, kw_dates)
+    img = png_values_imread(png, png_dir)
+    image_vals = png_values_image_values(date_str, img, ref_data)
     if image_vals[ROW_CNT] == 0:
       continue
     yield {
       **image_vals
       , DATE: date_str
       , IMG: img
-      , LOG_DATA: [day, file_idx, kw, city, None]
+      , LOG_DATA: [day, int(file_suf.split('.')[0]), kw, city, None]
       , BAR: [png, len(pngs), png_n]
       , PNG: png
       , PNG_N: png_n
     }
   if image_vals.get(ROWS, None) is None:
-    return []
+    return image_vals
 # -------------------------------------
 
 # -------------------------------------
@@ -1530,7 +1544,7 @@ def print_progress_bar(bar_data, row_cnt, row_n):
 # -------------------------------------
 
 # -------------------------------------
-def processed_ocr_data_to_logfile(data, kw_dir, city):
+def processed_ocr_data_to_logfile(data, city, kw_dir):
   writer = pd.ExcelWriter(join(kw_dir, f'det_names_{city}_{START_DT}.xlsx'))
   pd.DataFrame(data, columns=DF_DET_COLS).to_excel(writer, city, index=False)
   worksheet = writer.sheets[city]
@@ -1557,23 +1571,23 @@ def processed_xlsx_data_to_report_df(dfs):
 # -------------------------------------
 
 # -------------------------------------
-def process_screenshots(ref_data, dirs, year, kw, city):
+def process_screenshots(ref_data, city, kw, year, dirs):
   data = copy.deepcopy(PNG_PROCESSING_DICT)
   data[LOG] = print_log_header(PROCESS_PNG_MSG)
-  for png_vals in png_values_yield_images(ref_data, dirs[3], year, kw, city):
+  for png_vals in png_values_yield_pngs(ref_data, city, kw, year, dirs[3]):
     data[COUNTER][SCAN] += png_vals[ROW_CNT]
     for png_vals in png_values_yield_rows(png_vals):
       data = png_row_get_data(data, png_vals)
   if data[LOG_DATA]:
     data[LOG] += print_log(parse_stats_msg(data[COUNTER]), end=BR)
-    processed_ocr_data_to_logfile(data[LOG_DATA], dirs[1], city)
+    processed_ocr_data_to_logfile(data[LOG_DATA], city, dirs[1])
   else:
     data[LOG] += print_log(NO_SCREENS_MSG, 'XXXXX ', BR)
   return data
 # -------------------------------------
 
 # -------------------------------------
-def process_xlsx_data(dirs, city, kw_date, dfs):
+def process_xlsx_data(dfs, kw_date, city, dirs):
   dfs[LOG] += print_log_header(PROCESS_XLSX_MSG)
   dfs = load_xlsx_data_into_dfs(dirs, city, dfs)
   if dfs[AVA] is None:
@@ -1696,9 +1710,9 @@ def rider_ee_pre_c_update(df_row, contract, kw_date):
 # -------------------------------------
 
 # -------------------------------------
-def rider_ee_to_formated_xlsx(city, ree_dir, df_ee):
+def rider_ee_to_formated_xlsx(city, df_ee):
   row_cnt = df_ee.shape[0] + 1
-  writer = pd.ExcelWriter(parse_city_ee_filepath(city, ree_dir))
+  writer = pd.ExcelWriter(parse_city_ee_filepath(city))
   df_ee.to_excel(writer, city, index=False)
   workbook = writer.book
   worksheet = writer.sheets[city]
@@ -1800,26 +1814,26 @@ def screenshots_merge_daily_files(city, dirs):
 # -------------------------------------
 
 # -------------------------------------
-def shiftplan_check(city, year, kw, dirs, run_args):
-  start = time.perf_counter()
+def shiftplan_check(city, kw, year, dirs, run_args):
   get_ava, merge, tidy_only, ee_only, visualize = run_args
+  start = time.perf_counter()
   pre = '=' * os.get_terminal_size().columns + NL
-  dfs = {LOG: print_log_header(parse_sp_check_msg(city, year, kw), pre=pre)}
+  dfs = {LOG: print_log_header(parse_sp_check_msg(city, kw, year), pre=pre)}
   dfs[LOG] += tidy_screenshot_files(city, dirs, merge)
   if tidy_only:
     return shiftplan_check_log_city_runtime(city, start, dfs[LOG])
   kw_date = date.fromisocalendar(year, kw, 1)
-  dfs = process_xlsx_data(dirs, city, kw_date, dfs)
+  dfs = process_xlsx_data(dfs, kw_date, city, dirs)
   if dfs.get(AVA, None) is None:
     return shiftplan_check_log_city_runtime(city, start, dfs[LOG])
   if visualize and dfs.get(REP, None) is not None:
-    dfs[LOG] += plot_shift_distribution(dfs, city, year, kw, dirs[0])
+    dfs[LOG] += plot_shift_distribution(dfs, city, kw, year, dirs[0])
     return shiftplan_check_log_city_runtime(city, start, dfs[LOG])
   if get_ava and TESSERACT_AVAILABLE:
-    data = process_screenshots(dfs[REF], dirs, year, kw, city)
-    dfs = shiftplan_report_png_data_update(data, dfs, kw_date, city)
+    data = process_screenshots(dfs[REF], city, kw, year, dirs)
+    dfs = shiftplan_report_png_data_update(dfs, data, kw_date, city)
   if SAVE_REP:
-    rider_ee_to_formated_xlsx(city, dirs[4], dfs[EE])
+    rider_ee_to_formated_xlsx(city, dfs[EE])
     if ee_only:
       return shiftplan_check_log_city_runtime(city, start, dfs[LOG])
     dfs[REP] = shiftplan_report_remove_unnecessary(dfs[REP])
@@ -1833,7 +1847,7 @@ def shiftplan_check_log_city_runtime(city, start, log):
 # -------------------------------------
 
 # -------------------------------------
-def shiftplan_report_png_data_update(data, dfs, kw_date, city):
+def shiftplan_report_png_data_update(dfs, data, kw_date, city):
   dfs[LOG] += data.pop(LOG)
   only_ee = []
   only_screen = []
@@ -1957,11 +1971,10 @@ def tidy_png_files(city, dirs):
 
 # -------------------------------------
 def tidy_screenshot_files(city, dirs, merge):
-  log = tidy_jpg_files(city, dirs)
-  if not log:
-    log += tidy_png_files(city, dirs)
-  if not log:
-    log += tidy_zip_files(city, dirs)
+  log = ''
+  log += tidy_jpg_files(city, dirs)
+  log += tidy_png_files(city, dirs)
+  log += tidy_zip_files(city, dirs)
   if log:
     log += print_log(f'+++++ saved PNGs in: {dirs[3]}{BR}')
     if merge:
@@ -1987,10 +2000,10 @@ def tidy_screenshot_fn(original, fn_cf, idx_dict, log, suf='png'):
         similarity = 100
         break
   idx_dict[current_day] += 1
-  png_filename = f'{current_day}_{idx_dict[current_day]}.{suf}'
+  tidy_png_fn = f'{current_day}_{idx_dict[current_day]}.{suf}'
   if similarity != 100:
-    log += print_log(f'{TAB}- {original = }, saved as = {png_filename}')
-  return png_filename, idx_dict, log
+    log += print_log(f'{TAB}- {original = }, saved as = {tidy_png_fn}')
+  return tidy_png_fn, idx_dict, log
 # -------------------------------------
 
 # -------------------------------------
@@ -2019,6 +2032,18 @@ def tidy_zip_files(city, dirs):
     log += print_log('-----')
   return log
 # -------------------------------------
+
+# -------------------------------------
+def yield_run_kws(start_year, last_year, start_kw, last_kw):
+  if last_year <= start_year:
+    last_year = start_year
+    if last_kw < start_kw:
+      last_kw = start_kw
+  first_kw = date.fromisocalendar(start_year, start_kw, 1)
+  end_kw = date.fromisocalendar(last_year, last_kw + 1, 1)
+  for current_kw in pd.date_range(first_kw, end_kw, freq='W'):
+    yield current_kw.isocalendar()[:2]
+# -------------------------------------
 # =================================================================
 
 
@@ -2026,38 +2051,29 @@ def tidy_zip_files(city, dirs):
 # ### MAIN FUNCTION ###
 # =================================================================
 # -------------------------------------
-def main(s_year, l_year, start_kw, l_kw, cities, *run_args):
+def main(start_year, last_year, start_kw, last_kw, cities, *run_args):
   start = time.perf_counter()
   log = ''
   print_log_header(INITIAL_MSG, pre='=', suf='=')
-  if l_year < s_year:
-    l_year = s_year
-  if l_kw < start_kw:
-    l_kw = start_kw 
-  for year in range(s_year, l_year + 1):
-    global YEAR
-    YEAR = year
-    spd_dir = join(BASE_DIR, 'Schichtplan_Daten', str(YEAR))
-    for kw in range(start_kw, l_kw + 1):
-      kw_dir = join(spd_dir, f'KW{kw}')
-      if not exists(kw_dir):
-        print(f'##### Couldn`t find "{kw_dir}"{BR}')
-        continue
-      log_dir = check_make_dir(kw_dir, 'logs')
-      screen_dir = join(kw_dir, 'Screenshots')
-      ree_dir = check_make_dir(BASE_DIR, EE)
-      try:
-        for city in cities:
-          png_dir = check_make_dir(screen_dir, city)
-          dirs = (kw_dir, log_dir, screen_dir, png_dir, ree_dir)
-          log += shiftplan_check(city, year, kw, dirs, run_args)
-      except Exception as ex:
-        log += f'{type(ex)=} | {repr(ex)=}{NL}{parse_break_line("#")}'
-        raise ex
-      finally:
-        if DEV == 0:
-          with open(join(log_dir, LOG_FN), 'w', encoding='utf-8') as logfile:
-            logfile.write(log)
+  for year, kw in yield_run_kws(start_year, last_year, start_kw, last_kw):
+    kw_dir = join(BASE_DIR, 'Schichtplan_Daten', str(year), f'KW{kw}')
+    if not exists(kw_dir):
+      print(f'##### Couldn`t find "{kw_dir}"{BR}')
+      continue
+    log_dir = check_make_dir(kw_dir, 'logs')
+    screen_dir = join(kw_dir, 'Screenshots')
+    dirs = [kw_dir, log_dir, screen_dir, None]
+    try:
+      for city in cities:
+        dirs[3] = check_make_dir(screen_dir, city)
+        log += shiftplan_check(city, kw, year, dirs, run_args)
+    except Exception as ex:
+      log += f'{type(ex)=} | {repr(ex)=}{NL}{parse_break_line("#")}'
+      raise ex
+    finally:
+      if DEV == 0:
+        with open(join(log_dir, LOG_FN), 'w', encoding='utf-8') as logfile:
+          logfile.write(log)
   log += print_log_header(parse_run_end_msg(start), pre='=', suf='=', brk=NL)
 # -------------------------------------
 # =================================================================
@@ -2071,22 +2087,22 @@ if __name__ == '__main__':
   from argparse import ArgumentParser
   parser = ArgumentParser()
   parser.add_argument('-y', '--year', type=int, default=YEAR, help=P_Y)
-  parser.add_argument('-ly', '--last_year', type=int, default=0)
-  parser.add_argument('-kw', '--kalenderwoche', type=int, default=1, help=P_KW)
-  parser.add_argument('-lkw','--last_kw',  type=int, default=0, help=P_LKW)
+  parser.add_argument('-z', '--last_year', type=int, default=0)
+  parser.add_argument('-k', '--kalenderwoche', type=int, default=KW, help=P_KW)
+  parser.add_argument('-l','--last_kw',  type=int, default=0, help=P_LKW)
   parser.add_argument('-c', '--cities', nargs='*', default=DEF_CITY, help=P_C)
   parser.add_argument('-a', '--get_avail', action=STORE_TRUE, help=P_A)
   parser.add_argument('-m', '--mergeperday', action=STORE_TRUE, help=P_M)
-  parser.add_argument('-to', '--tidy_only', action=STORE_TRUE, help=P_TO)
-  parser.add_argument('-eeo','--ersterfassung',  action=STORE_TRUE, help=P_EEO)
+  parser.add_argument('-t', '--tidy_only', action=STORE_TRUE, help=P_TO)
+  parser.add_argument('-e','--ersterfassung',  action=STORE_TRUE, help=P_EEO)
   parser.add_argument('-v', '--visualize_shifts', action=STORE_TRUE, help=P_V)
-  parser.add_argument('-dev','--devmode',  type=int, default=0)
-  parser.add_argument('-eiv','--ext_img_variations',  action='store_true')
+  parser.add_argument('--dev','--devmode',  type=int, default=0)
+  parser.add_argument('-x','--ext_img_variations',  action='store_true')
   parser.add_argument('-d', '--days', nargs='*', default=WEEKDAYS)
-  parser.add_argument('-idx', '--file_idx', default=None)
+  parser.add_argument('-i', '--file_idx', default=None)
   parser.add_argument('-r', '--row_idx', type=int, default=0)
   parser.add_argument('-lr', '--last_row', type=int, default=0)
-  parser.add_argument('-rep','--store_reports',  action='store_true')
+  parser.add_argument('-s','--store_reports',  action='store_true')
   arg_dict = parser.parse_args().__dict__
   print(' RUN PARAMETER '.center(80, '='))
   for key, value in arg_dict.items():

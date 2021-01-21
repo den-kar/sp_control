@@ -60,6 +60,7 @@ usage: sp_control.py [-h] [-y START_YEAR] [-z LAST_YEAR] [-k START_KW] [-l LAST_
   1. `STRG + ALT + T` drücken
   1. `conda activate Takeaway` eingeben
   1. zum Datei Verzeichnis navigieren mit `cd ~/pfad/zu/sp_control-master`
+  1. Tool starten mit `python sp_control.py`, gewünschte Parametern hinzufügen
 
 **Windows**
   1. _Anaconda Prompt_ öffnen

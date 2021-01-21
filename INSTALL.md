@@ -203,14 +203,15 @@ usage: sp_control.py [-h] [-y START_YEAR] [-z LAST_YEAR] [-k START_KW] [-l LAST_
   - in _Anaconda Prompt_ eingeben `cd <Laufwerk>:\pfad\zu\sp_control-master`
   - mit `Enter` bestätigen
 
-  4. `sp_control.py` mit gewünschten Parametern eingeben und mit `Enter` bestätigen
+  4. Tool starten
+   - `python sp_control.py` mit gewünschten Parametern eingeben
+   - mit `Enter` bestätigen
 
 ---
 ### Beispielanwedungen
 
-
 #### Standard Wochenreport mit Daten Visualisierung für default Städte
-> sp_control.py -a -v
+> python sp_control.py -a -v
   - liest Daten der folgenden KW vom Zeitpunkt der Ausführung
   - default Städte
     - default Städte können in der `config_report.json` auf die eigene Region angepasst werden, der Standard Wert ist ["Frankfurt", "Offenbach"]
@@ -225,9 +226,8 @@ usage: sp_control.py [-h] [-y START_YEAR] [-z LAST_YEAR] [-k START_KW] [-l LAST_
     - `Frankfurt_[2021-01-25 - 2021-01-31].png` (je Tag eine Datei)
     - `Offenbach_[2021-01-25 - 2021-01-31].png` (je Tag eine Datei)
 
-
 #### Erstellung vollständiger `Rider_Ersterfassung_<STADTNAME>.xlsx` Datei
-> sp_control.py -y 2019 -k 29 -z 2021 -l 4 -e -c Frankfurt
+> python sp_control.py -y 2019 -k 29 -z 2021 -l 4 -e -c Frankfurt
   - ab KW 1 / 2019
   - bis KW 4 / 2021
   - Stadt Frankfurt

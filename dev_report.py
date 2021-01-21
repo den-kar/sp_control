@@ -189,6 +189,7 @@ P_M = (
 P_TO = 'Räumt alle Verfügbarkeiten Screenshot Dateien auf'
 P_V = 'Daten Visualisierung, erstellt Plots der vergebenen Schichten'
 P_Y = 'Jahr der zu prüfenden Daten, default: heutiges Jahr'
+P_Z = 'Letztes Jahr der zu prüfenden Daten, default: heutiges Jahr'
 REDUCE_HOURS = ' -> auf Min.Std. reduzieren'
 REF = 'reference_data'
 REP = 'report'
@@ -2087,7 +2088,7 @@ if __name__ == '__main__':
   from argparse import ArgumentParser
   parser = ArgumentParser()
   parser.add_argument('-y', '--year', type=int, default=YEAR, help=P_Y)
-  parser.add_argument('-z', '--last_year', type=int, default=0)
+  parser.add_argument('-z', '--last_year', type=int, default=0, help=P_Z)
   parser.add_argument('-k', '--kalenderwoche', type=int, default=KW, help=P_KW)
   parser.add_argument('-l','--last_kw',  type=int, default=0, help=P_LKW)
   parser.add_argument('-c', '--cities', nargs='*', default=DEF_CITY, help=P_C)

@@ -243,8 +243,8 @@ if not exists(OUTPUT_DIR):
   os.makedirs(OUTPUT_DIR)
 OUT_FILE_PRE = ''
 REE_DIR = join(BASE_DIR, EE)
-if not exists(OUTPUT_DIR):
-  os.makedirs(OUTPUT_DIR)
+if not exists(REE_DIR):
+  os.makedirs(REE_DIR)
 # -------------------------------------
 
 # -------------------------------------

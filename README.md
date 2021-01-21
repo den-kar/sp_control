@@ -76,7 +76,10 @@ usage: sp_control.py [-h] [-y START_YEAR] [-z LAST_YEAR] [-k START_KW] [-l LAST_
   - in _Anaconda Prompt_ eingeben `cd <Laufwerk>:\pfad\zu\sp_control-master`
   - mit `Enter` bestätigen
 
+  4. `sp_control.py` mit gewünschten Parametern eingeben und mit `Enter` bestätigen
+
 ---
+
 ### Beispielanwedungen
 
 #### Standard Wochenreport mit Daten Visualisierung für default Städte

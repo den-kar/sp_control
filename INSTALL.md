@@ -39,12 +39,13 @@ Um in der gewünschten conda Python Umgebung zu arbeiten, muss in die Umgebung i
 
 Wenn im Terminal die aktive Zeile mit `(Takeaway)` anfängt, ist die Umgebung aktiviert
 
-#### 2.2 site-packages installieren
+#### 2.3 site-packages installieren
 In Terminal mit aktivierter Python Umgeben eingeben
 > conda install -c conda-forge pandas pillow xlrd xlsxwriter opencv fuzzywuzzy pytesseract matplotlib -y
 
 Anschließend im selben Terminal eingeben
 > pip install msoffcrypto-tool
+
 ---
 ### 3 Schichtplan Arbeitsordner einrichten
 
@@ -202,8 +203,11 @@ usage: sp_control.py [-h] [-y START_YEAR] [-z LAST_YEAR] [-k START_KW] [-l LAST_
   - in _Anaconda Prompt_ eingeben `cd <Laufwerk>:\pfad\zu\sp_control-master`
   - mit `Enter` bestätigen
 
+  4. `sp_control.py` mit gewünschten Parametern eingeben und mit `Enter` bestätigen
+
 ---
 ### Beispielanwedungen
+
 
 #### Standard Wochenreport mit Daten Visualisierung für default Städte
 > sp_control.py -a -v

@@ -157,13 +157,12 @@ Werk Student | 12
 
 **sp_control** wird von einem Terminal mit eingerichteter und aktivierter Python-Umgebung aus genutzt und bietet durch Eingabe von Parametern zuschaltbare Funktionen.
 
-```text
-usage: sp_control.py [-h] [-y YEAR] [-kw KALENDERWOCHE] [-lkw LAST_KW] [-c [CITIES [CITIES ...]]] [-a] [-to] [-m] [-eeo]
+```
+usage: sp_control.py [-h] [-y START_YEAR] [-z LAST_YEAR] [-k START_KW] [-l LAST_KW] [-c [CITIES [CITIES ...]]] [-a] [-t] [-m] [-e] [-v]
 ```
 
 #### Parameter
-```text
-optional arguments:
+```
   -h, --help            show this help message and exit
   -y START_YEAR, --start_year START_YEAR
                         Jahr der zu prüfenden Daten, default: heutiges Jahr
@@ -179,8 +178,7 @@ optional arguments:
   -t, --tidy_only       Räumt alle Verfügbarkeiten Screenshot Dateien auf
   -m, --mergeperday     Erstellt je Stadt und Tag eine zusammegesetzte Verfügbarkeiten-Screenshot-Datei
   -e, --ersterfassung   Erstellt nur die Rider_Ersterfassung Datei, ohne SP-Report
-  -v, --visualize_shifts
-                        Daten Visualisierung, erstellt Plots der vergebenen Schichten
+  -v, --visualization   Daten Visualisierung, erstellt Plots der vergebenen Schichten
 ```
 
 #### Terminal mit Python Umgebung öffnen und zum Arbeitsorder navigieren

@@ -3,6 +3,7 @@
   "cities": ["Frankfurt", "Offenbach"],
   "password": "",
   "aliases": {
+    "Darmstadt": ["darmstadt", "da"],
     "Frankfurt": ["frankfurt", "ffm", "frankfurt am main"],
     "Offenbach": ["offenbach", "of", "offenbach am main"],
     "Fürth": ["fürth", "fuerth"],

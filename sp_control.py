@@ -1908,7 +1908,7 @@ def yield_run_kws(start_year, last_year, start_kw, last_kw):
 # ### MAIN FUNCTION ###
 # =================================================================
 # -------------------------------------
-def main(start_year, last_year, start_kw, last_kw, cities, *run_args):
+def sp_control(start_year, last_year, start_kw, last_kw, cities, *run_args):
   start = time.perf_counter()
   log = print_log_header(INITIAL_MSG, pre='=', suf='=')
   for year, kw in yield_run_kws(start_year, last_year, start_kw, last_kw):
@@ -1931,14 +1931,9 @@ def main(start_year, last_year, start_kw, last_kw, cities, *run_args):
         logfile.write(log)
   print_log_header(parse_run_end_msg(start), pre='=', suf='=', brk=NL)
 # -------------------------------------
-# =================================================================
 
-
-# =================================================================
-# ### START SCRIPT ###
-# =================================================================
 # -------------------------------------
-if __name__ == '__main__':
+def main():
   from argparse import ArgumentParser
   parser = ArgumentParser()
   parser.add_argument('-y', '--start_year', type=int, default=YEAR, help=P_Y)
@@ -1951,6 +1946,16 @@ if __name__ == '__main__':
   parser.add_argument('-m', '--mergeperday', action=STORE_TRUE, help=P_M)
   parser.add_argument('-e', '--ersterfassung',  action=STORE_TRUE, help=P_EEO)
   parser.add_argument('-v', '--visualize', action=STORE_TRUE, help=P_V)
-  main(*parser.parse_args().__dict__.values())
+  sp_control(*parser.parse_args().__dict__.values())
+# -------------------------------------
+# =================================================================
+
+
+# =================================================================
+# ### START SCRIPT ###
+# =================================================================
+# -------------------------------------
+if __name__ == '__main__':
+  sys.exit(main())
 # -------------------------------------
 # =================================================================

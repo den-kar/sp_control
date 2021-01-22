@@ -2052,7 +2052,7 @@ def yield_run_kws(start_year, last_year, start_kw, last_kw):
 # ### MAIN FUNCTION ###
 # =================================================================
 # -------------------------------------
-def main(start_year, last_year, start_kw, last_kw, cities, *run_args):
+def sp_control(start_year, last_year, start_kw, last_kw, cities, *run_args):
   start = time.perf_counter()
   log = ''
   print_log_header(INITIAL_MSG, pre='=', suf='=')
@@ -2077,14 +2077,9 @@ def main(start_year, last_year, start_kw, last_kw, cities, *run_args):
           logfile.write(log)
   log += print_log_header(parse_run_end_msg(start), pre='=', suf='=', brk=NL)
 # -------------------------------------
-# =================================================================
 
-
-# =================================================================
-# ### START SCRIPT ###
-# =================================================================
 # -------------------------------------
-if __name__ == '__main__':
+def main():
   from argparse import ArgumentParser
   parser = ArgumentParser()
   parser.add_argument('-y', '--year', type=int, default=YEAR, help=P_Y)
@@ -2109,7 +2104,8 @@ if __name__ == '__main__':
   for key, value in arg_dict.items():
     print(f':::::   {key}:{(28 - len(key)) * " "}{value}')
   print(''.center(80, '.'))
-  *args, DEV, EIV, DAYS, FIDX, ROW, ENDROW, SAVE_REP = arg_dict.values()
+  global DEV, EIV, DAYS, ROW, ENDROW, SAVE_REP
+  *args, DEV, EIV, DAYS, file_idx, ROW, ENDROW, SAVE_REP = arg_dict.values()
   if DEV >= 1:
     SAVE_REP = False
     print(''.center(80, '-'))
@@ -2121,8 +2117,18 @@ if __name__ == '__main__':
   if DEV >= 4:
     if DAYS == WEEKDAYS:
       DAYS = ['Montag']
-    if FIDX is None:
-      FIDX = '1'
-  main(*args)
+    if file_idx is None:
+      file_idx = '1'
+  sp_control(*args)
+# -------------------------------------
+# =================================================================
+
+
+# =================================================================
+# ### START SCRIPT ###
+# =================================================================
+# -------------------------------------
+if __name__ == '__main__':
+  sys.exit(main())
 # -------------------------------------
 # =================================================================

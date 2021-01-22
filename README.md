@@ -83,9 +83,9 @@ usage: sp_control.py [-h] [-y START_YEAR] [-z LAST_YEAR] [-k START_KW] [-l LAST_
 
 ---
 
-### Beispielanwedungen
+### Beispielanwendungen
 
-#### Standard Wochenreport mit Daten Visualisierung für default Städte
+#### Standard Wochenreport, aktuelle Woche, mit Daten Visualisierung, default Städte
 > python sp_control.py -a -v
   - liest Daten der folgenden KW vom Zeitpunkt der Ausführung
   - default Städte
@@ -103,7 +103,7 @@ usage: sp_control.py [-h] [-y START_YEAR] [-z LAST_YEAR] [-k START_KW] [-l LAST_
 
 #### Erstellung vollständiger `Rider_Ersterfassung_<STADTNAME>.xlsx` Datei
 > python sp_control.py -y 2019 -k 29 -z 2021 -l 4 -e -c Frankfurt
-  - ab KW 1 / 2019
+  - ab KW 29 / 2019
   - bis KW 4 / 2021
   - Stadt Frankfurt
   - speichert nur Ersterfassung Datei 

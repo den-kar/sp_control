@@ -2096,7 +2096,7 @@ if __name__ == '__main__':
   parser.add_argument('-m', '--mergeperday', action=STORE_TRUE, help=P_M)
   parser.add_argument('-t', '--tidy_only', action=STORE_TRUE, help=P_TO)
   parser.add_argument('-e','--ersterfassung',  action=STORE_TRUE, help=P_EEO)
-  parser.add_argument('-v', '--visualize_shifts', action=STORE_TRUE, help=P_V)
+  parser.add_argument('-v', '--visualize', action=STORE_TRUE, help=P_V)
   parser.add_argument('--dev','--devmode',  type=int, default=0)
   parser.add_argument('-x','--ext_img_variations',  action='store_true')
   parser.add_argument('-d', '--days', nargs='*', default=WEEKDAYS)

@@ -52,7 +52,7 @@ usage: sp_control.py [-h] [-y START_YEAR] [-z LAST_YEAR] [-k START_KW] [-l LAST_
   -t, --tidy_only       Räumt alle Verfügbarkeiten Screenshot Dateien auf
   -m, --mergeperday     Erstellt je Stadt und Tag eine zusammegesetzte Verfügbarkeiten-Screenshot-Datei
   -e, --ersterfassung   Erstellt nur die Rider_Ersterfassung Datei, ohne SP-Report
-  -v, --visualization   Daten Visualisierung, erstellt Plots der vergebenen Schichten
+  -v, --visualize       Daten Visualisierung, erstellt Plots der vergebenen Schichten
 ```
 
 #### Terminal mit Python Umgebung öffnen

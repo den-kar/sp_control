@@ -67,6 +67,7 @@ BOLD = 'bold'
 BOR = 'border'
 BORDER = 'vertical_boundries'
 BR = '\n-----'
+BRK = ''.center(80, '-')
 CAL = 'call'
 CC_FE = 'current contract first entry'
 CEN = 'center'
@@ -88,8 +89,10 @@ DONE = 'processed_day_and_rider'
 DRI = 'Driver'
 DR_ID = 'Driver ID'
 DUPL = 'duplicates'
+DUPL_MSG = ' FOUND DUPLICATE NAMES '.center(80, '#')
 EE = 'Rider_Ersterfassung'
 EMPTY = 'empty_availability_cell'
+FILE_MISS_MSG = ' MISSING MEDATORY FILE '
 FILLED = 'filled_availability_cell'
 FI_ENT = 'first entry'
 FMT = 'format'
@@ -128,7 +131,6 @@ MIN_HOURS_MSG = 'weniger als Min.Std.'
 MIN_H_CHECK_MSG = 'Min.Std. prüfen'
 MIN_T = 'min_type'
 MIN_V = 'min_value'
-MISSING_FILE_MSG = ' MISSING MEDATORY FILE '
 MON = 'month'
 MORE_HOURS_MSG = 'mehr Stunden'
 MORE_THAN_AVAIL_MSG = 'mehr Std. als Verfügbarkeiten'
@@ -398,10 +400,8 @@ FMT_DICT = {
 RIDER_EE_COL_FMT = (
   ('A:A', 35, 'text')
   , ('B:B', 20, 'text')
-  , ('C:C', 15, 'int')
-  , ('D:D', 15, 'text')
-  , ('E:E', 15, 'text')
-  , ('F:F', 15, 'text')
+  , ('C:C', 10, 'int')
+  , ('D:F', 12, 'text')
   , ('G:G', 25, 'text')
   , ('H:H', 35, 'text')
   , ('I:I', 15, 'text')
@@ -559,7 +559,7 @@ def get_contract_and_avail_h(name, df_row, df_ava):
     if contract is None:
       contract = CON_BY_H[df_row[CON_H]]
   else:
-    avail = ava_row.squeeze()[H_AV]
+    avail = ava_row[H_AV]
     contract = ava_row[USER_T]
   return {CON_TYP: contract, AVA: avail}
 # -------------------------------------
@@ -599,10 +599,8 @@ def get_data_check_min_h(data):
     return data[MIN]
   if 'h/' not in data[MIN]:
     return data[MAX]
-  hours, period = data[MIN].split('h/')
-  if period == 'Monat':
-    return max(3, (int(hours) * 6 // 13) / 2)
-  return int(hours)
+  hrs, period = data[MIN].split('h/')
+  return max(3, (int(hrs) * 6 // 13) / 2) if period == 'Monat' else int(hrs)
 # -------------------------------------
 
 # -------------------------------------
@@ -743,6 +741,7 @@ def load_shift_xlsx_into_df(df):
 # -------------------------------------
 def load_xlsx_data_into_dfs(city, dirs, dfs):
   dfs[MON] = None
+  duplicates = []
   mendatory = [ALIAS[AVA][0], ALIAS[SHI][0]]
   for filename in os.listdir(dirs[0]):
     fn_cf = filename.casefold().replace('_', ' ').replace('-', ' ')
@@ -759,20 +758,38 @@ def load_xlsx_data_into_dfs(city, dirs, dfs):
       if df is None:
         break
     df.rename(columns=lambda x: str(x).strip(), inplace=True)
-    if any(fuzz.partial_ratio(alias, fn_cf) > 86 for alias in ALIAS[AVA]):
+    cols = {*df.columns}
+    if USER_N in cols:
+      df, duplicates = loaded_xls_remove_dupls(df, AVA, filename, duplicates)
       dfs[AVA] = load_avail_xlsx_into_df(df)
       mendatory.remove(ALIAS[AVA][0])
-    elif any(fuzz.partial_ratio(alias, fn_cf) > 86 for alias in ALIAS[SHI]):
+    elif SH_DA in cols:
       dfs[SHI] = load_shift_xlsx_into_df(df)
       mendatory.remove(ALIAS[SHI][0])
-    elif any(fuzz.partial_ratio(alias, fn_cf) > 86 for alias in ALIAS[MON]):
+    elif CON_H in cols:
+      df, duplicates = loaded_xls_remove_dupls(df, MON, filename, duplicates)
       dfs[MON] = load_month_xlsx_into_df(df)
+  if duplicates:
+    dfs[LOG] += print_log(parse_duplicates_msg(duplicates))
   if mendatory:
-    dfs[AVA] = None
-    dfs[LOG] += print_log_header(f'{MISSING_FILE_MSG}{mendatory}', '#', '', '')
+    dfs[LOG] += print_log_header(f'{FILE_MISS_MSG}{mendatory}', '#', '', '')
   else:
     dfs[EE] = load_ersterfassung_xlsx_into_df(city)
   return dfs
+# -------------------------------------
+
+# -------------------------------------
+def loaded_xls_remove_dupls(df, src, filename, duplicates):
+  name_col, id_col = (USER_N, U_ID) if src == AVA else (DRI, DR_ID)
+  df.sort_values([name_col, id_col], inplace=True)
+  dupl = df.duplicated(name_col, keep='last')
+  if dupl.any():
+    for idx, df_d in df[dupl].iterrows():
+      name = df_d[name_col]
+      removed_id = df_d[id_col]
+      rows = (idx + 2, idx + 3)
+      duplicates.append(f'{NL}{filename=}, {rows=}, {name=}, {removed_id=}')
+  return df.drop_duplicates(name_col, keep='last'), duplicates
 # -------------------------------------
 
 # -------------------------------------
@@ -805,6 +822,11 @@ def parse_city_runtime(city, start):
 # -------------------------------------
 def parse_date(day_str, kw_dates):
   return kw_dates[WEEKDAYS.index(day_str)]
+# -------------------------------------
+
+# -------------------------------------
+def parse_duplicates_msg(duplicates_list):
+  return f'{BRK}{NL}{DUPL_MSG}{"".join(duplicates_list)}{NL}{BRK}{BR}'
 # -------------------------------------
 
 # -------------------------------------
@@ -1434,14 +1456,19 @@ def processed_xlsx_data_to_report_df(dfs):
   data_list = []
   src = AVA if dfs[MON] is None else MON
   for name, df_row in dfs[src].iterrows():
-    data = get_new_df_entry()
-    data.update(get_base_data(name, df_row, src, dfs[AVA]))
-    data.update(get_min_hours(dfs[EE], dfs[REF][3], data[CON_TYP], name))
-    data.update(get_shifts(dfs[SHI], data[ID]))
-    data.update(get_given_hour_ratios(data[AVA], data[GIV], data[MAX]))
-    data.update(get_data_check_and_first_comment(data))
-    data_list.append(data)
+    data_list.append(process_rider_data(name, df_row, src, dfs))
   return pd.DataFrame(data_list).set_index(RID_NAM, drop=False)
+# -------------------------------------
+
+# -------------------------------------
+def process_rider_data(name, df_row, src, dfs):
+  data = get_new_df_entry()
+  data.update(get_base_data(name, df_row, src, dfs[AVA]))
+  data.update(get_min_hours(dfs[EE], dfs[REF][3], data[CON_TYP], name))
+  data.update(get_shifts(dfs[SHI], data[ID]))
+  data.update(get_given_hour_ratios(data[AVA], data[GIV], data[MAX]))
+  data.update(get_data_check_and_first_comment(data))
+  return data
 # -------------------------------------
 
 # -------------------------------------
@@ -1464,7 +1491,7 @@ def process_screenshots(ref_data, city, kw, year, dirs):
 def process_xlsx_data(dfs, kw_date, city, dirs):
   dfs[LOG] += print_log_header(PROCESS_XLSX_MSG)
   dfs = load_xlsx_data_into_dfs(city, dirs, dfs)
-  if dfs[AVA] is None:
+  if dfs.get(EE, None) is None:
     return dfs
   dfs = rider_ee_update_names(kw_date, city, dfs)
   dfs[REF] = reference_names_and_contract_data(dfs[EE], kw_date)
@@ -1690,7 +1717,7 @@ def shiftplan_check(city, kw, year, dirs, run_args):
     return shiftplan_check_log_city_runtime(city, start, dfs[LOG])
   kw_date = date.fromisocalendar(year, kw, 1)
   dfs = process_xlsx_data(dfs, kw_date, city, dirs)
-  if dfs.get(AVA, None) is None:
+  if dfs.get(REP, None) is None:
     return shiftplan_check_log_city_runtime(city, start, dfs[LOG])
   if visualize and dfs.get(REP, None) is not None:
     dfs[LOG] += plot_shift_distribution(dfs, city, kw, year, dirs[0])
@@ -1929,7 +1956,7 @@ def sp_control(start_year, last_year, start_kw, last_kw, cities, *run_args):
     finally:
       with open(join(log_dir, LOG_FN), 'w', encoding='utf-8') as logfile:
         logfile.write(log)
-  print_log_header(parse_run_end_msg(start), pre='=', suf='=', brk=NL)
+  return print_log_header(parse_run_end_msg(start), pre='=', suf='=', brk=NL)
 # -------------------------------------
 
 # -------------------------------------

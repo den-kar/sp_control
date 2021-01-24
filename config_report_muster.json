@@ -7,11 +7,6 @@
     "Frankfurt": ["frankfurt", "ffm", "frankfurt am main"],
     "Offenbach": ["offenbach", "of", "offenbach am main"],
     "Fürth": ["fürth", "fuerth"],
-    "Nürnberg": ["nuernberg", "nuremberg", "nue"],
-    "avail": ["verfügbarkeit", "availabilities", "verfuegbarkeiten"],
-    "month": ["monatsstunden", "stunden", "hours", "hour report", "working hours"],
-    "shift": [
-      "schichtplan", "schichtplanung", "working shifts", "planung", "shift report"
-    ]
+    "Nürnberg": ["nuernberg", "nuremberg", "nue"]
   }
 }

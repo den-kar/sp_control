@@ -41,7 +41,7 @@ Wenn im Terminal die aktive Zeile mit `(Takeaway)` anfängt, ist die Umgebung ak
 
 #### 2.3 site-packages installieren
 In Terminal mit aktivierter Python Umgeben eingeben
-> conda install -c conda-forge pandas pillow xlrd xlsxwriter opencv fuzzywuzzy pytesseract matplotlib -y
+> conda install -c conda-forge pandas pillow xlrd xlsxwriter openpyxl opencv fuzzywuzzy pytesseract matplotlib -y
 
 Anschließend im selben Terminal eingeben
 > pip install msoffcrypto-tool
@@ -49,7 +49,7 @@ Anschließend im selben Terminal eingeben
 ---
 ### 3 Schichtplan Arbeitsordner einrichten
 
-**Der Arbeitsordner hat folgende Struktur**
+**Der Arbeitsordner hat folgende Struktur, teile werden automatisch erstellt**
 ```md
 sp_control-master
 ├── Rider_Ersterfassung       (wird autom. erstellt)
@@ -66,9 +66,7 @@ sp_control-master
 └── sp_control.py
 ```
 
-#### Arbeitsordern und -dateien erstellen
-
-#### Weg A - aus git-respository
+#### Weg A - Dateien aus git-respository herunterladen
 
 ##### 3.1A git-repository runterladen
   1. auf [sp_control Projektseite](https://github.com/den-kar/sp_control) gehen
@@ -105,13 +103,11 @@ sp_control-master
   "cities": ["Frankfurt", "Offenbach"],
   "password": "",
   "aliases": {
+    "Darmstadt": ["darmstadt", "da"],
     "Frankfurt": ["frankfurt", "ffm", "frankfurt am main"],
+    "Fürth": ["fürth", "fuerth", "fue"],
+    "Nürnberg": ["nürnberg", "nuernberg", "nuremberg", "nbg", "nue"],
     "Offenbach": ["offenbach", "of", "offenbach am main"],
-    "Fürth": ["fürth", "fuerth"],
-    "Nürnberg": ["nuernberg", "nuremberg", "nue"],
-    "avail": ["verfügbarkeit", "availabilities", "verfuegbarkeiten"],
-    "month": ["monatsstunden", "stunden", "hours", "hour report", "working hours"],
-    "shift": ["schichtplan", "schichtplanung", "working shifts", "planung", "shift report"]
   }
 }
 ```
@@ -152,6 +148,21 @@ TE WS | 12
 Teilzeit | 30
 Vollzeit | 30
 Werk Student | 12
+
+---
+
+### 4 Anaconda Prompot einrichten (nur Windows, optional)
+1. `Windows`-Taste drücken
+1. `Anaconda Prompt` eingeben
+1. Rechts-Klick auf das `Anaconda Prompt` Feld
+1. im Kontextfenster auf `open file location` klicken
+1. im neuen Fenster Rechts-Klick auf `Anaconda Prompt Verknüpfung`
+1. im Kontextfenster auf `Eigenschaften` klicken
+1. im neuen Fenster auf den Reiter `Verknüpfung` gehen
+1. unter `Ziel:` hinter `\Anaconda3`, ganz ans Ende `\envs\Takeaway` hinzufügen
+1. unter `Ausführen:` den Pfad einfügen, in dem `sp_control.py` abliegt (z.B. `C:\Takeaway\sp_control-master`) 
+1. auf das `OK` Feld klicken
+
 
 ---
 ### Anwendung
@@ -196,11 +207,11 @@ usage: sp_control.py [-h] [-y START_YEAR] [-z LAST_YEAR] [-k START_KW] [-l LAST_
   - `Anaconda Prompt` eingeben
   - mit `Enter` bestätigen
 
-  2. Python Umgebung aktivieren
+  2. Python Umgebung aktivieren (überspringen, wenn **Schritt 4** durchgeführt wurde)
   - in _Anaconda Prompt_ `conda activate Takeaway` eingeben
   - mit `Enter` bestätigen
 
-  3. zum Datei Verzeichnis navigieren
+  3. zum Datei Verzeichnis navigieren (überspringen, wenn **Schritt 4** durchgeführt wurde)
   - wenn man den Ordner im Explorer öffnet und in die Adresszeile klickt, kann man den benötigten Pfad einfach kopieren
   - in _Anaconda Prompt_ eingeben `cd <Laufwerk>:\pfad\zu\sp_control-master`
   - mit `Enter` bestätigen

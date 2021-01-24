@@ -68,6 +68,7 @@ KERNEL_SHARP = np.array(([-1, -1, -1], [-1, 9, -1], [-1, -1, -1]), dtype="int")
 # -------------------------------------
 ALI = 'align'
 AVA = 'avail'
+AVAIL = 'Verfügbarkeiten'
 AVAILS = 'availablities'
 AV_ARGS = 'row_availability_args'
 BAD_RESO = 'bad_resolution'
@@ -206,6 +207,7 @@ ROW_N = 'row_number'
 SCAN = 'scanned'
 SCROLL_BAR = 'scroll_barf'
 SHI = 'shift'
+SHIFT = 'Schichtplan'
 SIC = 'sick'
 SIM_NAM = 'similar names'
 SH_DA = 'Shift Date'
@@ -273,6 +275,7 @@ CONVERT_COLS_MONTH = (
 DF_DET_COLS = ('kw', CIT, 'day', 'index', 'row', 'avail', 'name', 'ocr')
 DIGITS = {*map(str, range(10))}
 INVALID_WORDS = {'wochenstunden', 'gefahrene'}
+MENDATORY = (AVAIL, SHIFT)
 REPORT_HEADER = (
   ID, RID_NAM, CON_TYP, MAX, MIN, AVA, GIV, GIV_AVA, GIV_MAX, GIV_SHI, AVAILS
   , PAI_MAX, WOR, VAC, SIC, PAI, UNP, CMT, CAL, 'cmt shift coordinator'
@@ -463,18 +466,16 @@ if exists(CONFIG_FP):
   ALIAS = {k: tuple(x for x in alis) for k, alis in config['aliases'].items()}
   DEF_CITY = config['cities']
   if 'win' in sys.platform:
-    pytesseract.tesseract_cmd = config['tesseract']['cmd_path']
+    pytesseract.tesseract_cmd = config['cmd_path']
   if 'password' in config:
     PW = config['password']
 else:
   ALIAS = {
-    'Frankfurt': ('frankfurt', 'ffm', 'frankfurt am main')
+    'Darmstadt': ['darmstadt', 'da']
+    ,'Frankfurt': ('frankfurt', 'ffm', 'frankfurt am main')
     , 'Fürth': ['fürth', 'fuerth']
     , 'Nürnberg': ['nuernberg', 'nuremberg', 'nue']
     , 'Offenbach': ('offenbach', 'of', 'offenbach am main')
-    , AVA: ('Verfügbarkeit', 'Verfügbarkeiten', 'Availabilities')
-    , MON: ('Monatsstunden', 'Stunden', 'Working Hours')
-    , SHI: ('Schichtplan', 'Schichtplanung', 'Working Shifts')
   }
   DEF_CITY = ('Frankfurt', 'Offenbach')
 # -------------------------------------
@@ -759,7 +760,7 @@ def load_shift_xlsx_into_df(df):
 def load_xlsx_data_into_dfs(dirs, city, dfs):
   dfs[MON] = None
   duplicates = []
-  mendatory = [ALIAS[AVA][0], ALIAS[SHI][0]]
+  mendatory = list(MENDATORY)
   for filename in os.listdir(dirs[0]):
     fn_cf = filename.casefold().replace('_', ' ').replace('-', ' ')
     if invalid_city_xlsx_filename(fn_cf, city):
@@ -779,10 +780,10 @@ def load_xlsx_data_into_dfs(dirs, city, dfs):
     if USER_N in cols:
       df, duplicates = loaded_xls_remove_dupls(df, AVA, filename, duplicates)
       dfs[AVA] = load_avail_xlsx_into_df(df)
-      mendatory.remove(ALIAS[AVA][0])
+      mendatory.remove(AVAIL)
     elif SH_DA in cols:
       dfs[SHI] = load_shift_xlsx_into_df(df)
-      mendatory.remove(ALIAS[SHI][0])
+      mendatory.remove(SHIFT)
     elif CON_H in cols:
       df, duplicates = loaded_xls_remove_dupls(df, MON, filename, duplicates)
       dfs[MON] = load_month_xlsx_into_df(df)
@@ -790,7 +791,6 @@ def load_xlsx_data_into_dfs(dirs, city, dfs):
     dfs[LOG] += print_log(parse_duplicates_msg(duplicates))
   if mendatory:
     dfs[LOG] += print_log_header(f'{FILE_MISS_MSG}{mendatory}', '#', '', '')
-    dfs[LOG] += print_log_header(f'{MISSING_FILE_MSG}{mendatory}', '#', '', '')
   else:
     dfs[EE] = load_ersterfassung_xlsx_into_df(city)
   return dfs

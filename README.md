@@ -8,7 +8,7 @@ Vollständige Anleitung [INSTALL.md](https://github.com/den-kar/sp_control/blob/
 
 ---
 ### Schichtplan Arbeitsordner Struktur
-```text
+```md
 sp_control-master
 ├── Rider_Ersterfassung       (wird autom. erstellt)
 │   └── Rider_Ersterfassung_<STADTNAME>.xlsx           (je Stadt eine xlsx)
@@ -68,11 +68,11 @@ usage: sp_control.py [-h] [-y START_YEAR] [-z LAST_YEAR] [-k START_KW] [-l LAST_
   - `Anaconda Prompt` eingeben
   - mit `Enter` bestätigen
 
-  2. Python Umgebung aktivieren
+  2. Python Umgebung aktivieren (überspringen, wenn _Anaconda Prompt_ eingerichtet ist)
   - in _Anaconda Prompt_ `conda activate Takeaway` eingeben
   - mit `Enter` bestätigen
 
-  3. zum Datei Verzeichnis navigieren
+  3. zum Datei Verzeichnis navigieren (überspringen, wenn _Anaconda Prompt_ eingerichtet ist)
   - wenn man den Ordner im Explorer öffnet und in die Adresszeile klickt, kann man den benötigten Pfad einfach kopieren
   - in _Anaconda Prompt_ eingeben `cd <Laufwerk>:\pfad\zu\sp_control-master`
   - mit `Enter` bestätigen

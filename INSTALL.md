@@ -107,7 +107,7 @@ sp_control-master
     "Frankfurt": ["frankfurt", "ffm", "frankfurt am main"],
     "Fürth": ["fürth", "fuerth", "fue"],
     "Nürnberg": ["nürnberg", "nuernberg", "nuremberg", "nbg", "nue"],
-    "Offenbach": ["offenbach", "of", "offenbach am main"],
+    "Offenbach": ["offenbach", "of", "offenbach am main"]
   }
 }
 ```

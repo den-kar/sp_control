@@ -7,6 +7,10 @@
     "Frankfurt": ["frankfurt", "ffm", "frankfurt am main"],
     "Offenbach": ["offenbach", "of", "offenbach am main"],
     "Fürth": ["fürth", "fuerth"],
-    "Nürnberg": ["nuernberg", "nuremberg", "nue"]
+    "Nürnberg": ["nuernberg", "nuremberg", "nue"],
+    "Stuttgart": ["stuttgart", "stg"],
+    "Bielefeld": ["bielefeld", "osnabrБck", "bi"],
+    "Münster": ["münster", "mБnster", "ms"],
+    "Osnabrück": ["osnabrück", "os"]
   }
 }

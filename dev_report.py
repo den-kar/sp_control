@@ -251,7 +251,6 @@ ZP = '0%'
 BASE_DIR = dirname(abspath(__file__))
 CONFIG_FP = join(BASE_DIR, 'config_report.json')
 EE_BACKUP = f'{EE}.xlsx'
-LOG_FN = f'report_{START_DT}.log'
 OUTPUT_DIR = join(BASE_DIR, 'Schichtplan_bearbeitet')
 if not exists(OUTPUT_DIR):
   os.makedirs(OUTPUT_DIR)
@@ -302,6 +301,7 @@ WEEKDAY_ABREVATIONS = (
   ('mo', 'mon'), ('di', 'tue'), ('mi', 'wed'), ('do', 'thu'), ('fr', 'fri')
   , ('sa', 'sat'), ('so', 'sun')
 )
+WESTFALEN = ('Osnabrück', 'Münster', 'Bielefeld')
 # -------------------------------------
 
 # -------------------------------------
@@ -862,11 +862,6 @@ def parse_progress_bar(bar_len, prog, pre, suf):
 # -------------------------------------
 def parse_run_end_msg(start):
   return f'TOTAL RUNTIME: {time.perf_counter() - start:.2f} s'
-# -------------------------------------
-
-# -------------------------------------
-def parse_sp_check_msg(city, kw, year):
-  return f'{CITY_LOG_PRE} {city} | KW {kw} / {year}'
 # -------------------------------------
 
 # -------------------------------------
@@ -1548,6 +1543,12 @@ def print_no_name_determined(avail_str, name, ocr_read, png_vals):
 # -------------------------------------
 
 # -------------------------------------
+def print_log_sp_check_msg(city, kw, year):
+  pre = '=' * os.get_terminal_size().columns + NL
+  return print_log_header(f'{CITY_LOG_PRE} {city} | KW {kw} / {year}', pre=pre)
+# -------------------------------------
+
+# -------------------------------------
 def print_progress_bar(bar_data, row_cnt, row_n):
   png, png_cnt, png_n = bar_data
   progress = (png_n + row_n / row_cnt) / png_cnt
@@ -1569,7 +1570,7 @@ def print_progress_bar(bar_data, row_cnt, row_n):
 
 # -------------------------------------
 def processed_ocr_data_to_logfile(data, city, kw_dir):
-  writer = pd.ExcelWriter(join(kw_dir, f'det_names_{city}_{START_DT}.xlsx'))
+  writer = pd.ExcelWriter(join(kw_dir, f'{city}_{START_DT}.xlsx'))
   pd.DataFrame(data, columns=DF_DET_COLS).to_excel(writer, city, index=False)
   worksheet = writer.sheets[city]
   worksheet.autofilter('A1:H1')
@@ -1844,18 +1845,20 @@ def screenshots_merge_daily_files(city, dirs):
 
 # -------------------------------------
 def shiftplan_check(city, kw, year, dirs, run_args):
-  get_ava, merge, tidy_only, ee_only, visualize = run_args
   start = time.perf_counter()
-  pre = '=' * os.get_terminal_size().columns + NL
-  dfs = {LOG: print_log_header(parse_sp_check_msg(city, kw, year), pre=pre)}
-  dfs[LOG] += tidy_screenshot_files(city, dirs, merge)
+  dfs = {LOG: print_log_sp_check_msg(city, kw, year)}
+  get_ava, merge, tidy_only, ee_only, visualize = run_args
+  if city in WESTFALEN:
+    get_ava = False
+  else:
+    dfs[LOG] += tidy_screenshot_files(city, dirs, merge)
   if tidy_only:
     return shiftplan_check_log_city_runtime(city, start, dfs[LOG])
   kw_date = date.fromisocalendar(year, kw, 1)
   dfs = process_xlsx_data(dfs, kw_date, city, dirs)
   if dfs.get(REP, None) is None:
     return shiftplan_check_log_city_runtime(city, start, dfs[LOG])
-  if visualize and dfs.get(REP, None) is not None:
+  if visualize:
     dfs[LOG] += plot_shift_distribution(dfs, city, kw, year, dirs[0])
     return shiftplan_check_log_city_runtime(city, start, dfs[LOG])
   if get_ava and TESSERACT_AVAILABLE:
@@ -1863,10 +1866,9 @@ def shiftplan_check(city, kw, year, dirs, run_args):
     dfs = shiftplan_report_png_data_update(dfs, data, kw_date, city)
   if SAVE_REP:
     rider_ee_to_formated_xlsx(city, dfs[EE])
-    if ee_only:
-      return shiftplan_check_log_city_runtime(city, start, dfs[LOG])
-    dfs[REP] = shiftplan_report_remove_unnecessary(dfs[REP])
-    dfs[LOG] += shiftplan_report_to_formated_xlsx(dfs[REP], city, kw)
+    if not ee_only:
+      dfs[REP] = shiftplan_report_remove_unnecessary(dfs[REP])
+      dfs[LOG] += shiftplan_report_to_formated_xlsx(dfs[REP], city, kw)
   return shiftplan_check_log_city_runtime(city, start, dfs[LOG])
 # -------------------------------------
 
@@ -2063,6 +2065,25 @@ def tidy_zip_files(city, dirs):
 # -------------------------------------
 
 # -------------------------------------
+def update_directories(city, kw_dir):
+  if city in WESTFALEN:
+    kw_dir = join(kw_dir, city)
+    log_dir = check_make_dir(kw_dir, 'logs')
+    screen_dir = png_dir = None
+    try:
+      os.rename(kw_dir.replace('ü', 'Б'), kw_dir)
+    except FileNotFoundError:
+      pass
+    for fn in os.listdir(kw_dir):
+      os.rename(join(kw_dir, fn), join(kw_dir, fn.replace("Б", "ü")))
+  else:
+    log_dir = check_make_dir(kw_dir, 'logs')
+    screen_dir = join(kw_dir, 'Screenshots')
+    png_dir = check_make_dir(screen_dir, city)
+  return [kw_dir, log_dir, screen_dir, png_dir]
+# -------------------------------------
+
+# -------------------------------------
 def yield_run_kws(start_year, last_year, start_kw, last_kw):
   if last_year <= start_year:
     last_year = start_year
@@ -2082,28 +2103,25 @@ def yield_run_kws(start_year, last_year, start_kw, last_kw):
 # -------------------------------------
 def sp_control(start_year, last_year, start_kw, last_kw, cities, *run_args):
   start = time.perf_counter()
-  log = ''
   print_log_header(INITIAL_MSG, pre='=', suf='=')
   for year, kw in yield_run_kws(start_year, last_year, start_kw, last_kw):
     kw_dir = join(BASE_DIR, 'Schichtplan_Daten', str(year), f'KW{kw}')
     if not exists(kw_dir):
       print(f'##### Couldn`t find "{kw_dir}"{BR}')
       continue
-    log_dir = check_make_dir(kw_dir, 'logs')
-    screen_dir = join(kw_dir, 'Screenshots')
-    dirs = [kw_dir, log_dir, screen_dir, None]
-    try:
-      for city in cities:
-        dirs[3] = check_make_dir(screen_dir, city)
-        log += shiftplan_check(city, kw, year, dirs, run_args)
-    except Exception as ex:
-      log += f'{type(ex)=} | {repr(ex)=}{NL}{parse_break_line("#")}'
-      raise ex
-    finally:
+    for city in cities:
+      dirs = update_directories(city, kw_dir)
+      try:
+        log = shiftplan_check(city, kw, year, dirs, run_args)
+      except KeyboardInterrupt:
+        raise
+      except Exception as ex:
+        log = print_log(f'{parse_break_line("#")}{NL}{repr(ex)=}{NL}{BRK}')
       if DEV == 0:
-        with open(join(log_dir, LOG_FN), 'w', encoding='utf-8') as logfile:
+        log_path = join(dirs[1], f'{city}_{START_DT}.log')
+        with open(log_path, 'w', encoding='utf-8') as logfile:
           logfile.write(log)
-  return print_log_header(parse_run_end_msg(start), pre='=', suf='=', brk=NL)
+  print_log_header(parse_run_end_msg(start), pre='=', suf='=', brk=NL)
 # -------------------------------------
 
 # -------------------------------------
@@ -2120,7 +2138,7 @@ def main():
   parser.add_argument('-t', '--tidy_only', action=STORE_TRUE, help=P_TO)
   parser.add_argument('-e','--ersterfassung',  action=STORE_TRUE, help=P_EEO)
   parser.add_argument('-v', '--visualize', action=STORE_TRUE, help=P_V)
-  parser.add_argument('--dev','--devmode',  type=int, default=0)
+  parser.add_argument('--dev',  type=int, default=0)
   parser.add_argument('-x','--ext_img_variations',  action='store_true')
   parser.add_argument('-d', '--days', nargs='*', default=WEEKDAYS)
   parser.add_argument('-i', '--file_idx', default=None)

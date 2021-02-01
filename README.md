@@ -32,7 +32,7 @@ sp_control-master
 **sp_control** wird von einem Terminal mit eingerichteter und aktivierter Python-Umgebung aus genutzt und bietet durch Eingabe von Parametern zuschaltbare Funktionen.
 
 ```
-usage: sp_control.py [-h] [-y START_YEAR] [-z LAST_YEAR] [-k START_KW] [-l LAST_KW] [-c [CITIES [CITIES ...]]] [-a] [-t] [-m] [-e] [-v]
+usage: python sp_control.py [-h] [-y START_YEAR] [-z LAST_YEAR] [-k START_KW] [-l LAST_KW] [-c [CITIES [CITIES ...]]] [-a] [-t] [-m] [-e] [-v]
 ```
 
 #### Parameter

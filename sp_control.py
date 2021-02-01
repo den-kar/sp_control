@@ -4,7 +4,8 @@
 # -------------------------------------
 from collections import defaultdict
 import copy
-from datetime import date, datetime, timedelta
+import datetime
+from datetime import date, datetime, time, timedelta
 import getpass
 import io
 import os
@@ -12,7 +13,7 @@ from os.path import abspath, basename, dirname, exists, join
 import shutil
 import signal
 import sys
-import time
+from time import perf_counter
 # -------------------------------------
 import cv2 as cv
 from fuzzywuzzy import fuzz
@@ -116,6 +117,7 @@ LEF = 'left'
 LINE = 'thin_line'
 LINK = 'linked'
 LOG = 'log'
+LOGS = 'logs'
 LOG_DATA = 'determined_names_log_data'
 MAX = 'max'
 MAX_H = 'Total Availability'
@@ -195,6 +197,7 @@ ROWS = 'row_y_values'
 ROW_CNT = 'row_count'
 ROW_N = 'row_number'
 SCAN = 'scanned'
+SCREENS = 'Screenshots'
 SCROLL_BAR = 'scroll_barf'
 SHI = 'shift'
 SHIFT = 'Schichtplan'
@@ -202,6 +205,7 @@ SIC = 'sick'
 SIM_NAM = 'similar names'
 SH_DA = 'Shift Date'
 SH_DAY = 'Shift Day'
+SP_DATA = 'Schichtplan_Daten'
 STD_REP = 'stundenreports'
 STORE_TRUE = 'store_true'
 STRIP_CHARS = """ .,-_'`"()|"""
@@ -265,6 +269,11 @@ DF_DET_COLS = ('kw', CIT, 'day', 'index', 'row', 'avail', 'name', 'ocr')
 DIGITS = {*map(str, range(10))}
 INVALID_WORDS = {'wochenstunden', 'gefahrene'}
 MENDATORY = (AVAIL, SHIFT)
+MONTHS = (
+  'jan', 'feb', 'mär', 'apr', 'mai', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov'
+  , 'dez'
+)
+REL_TIME = [time(*divmod(x, 60)) for x in range(690, 1321, 30)]
 REPORT_HEADER = (
   ID, RID_NAM, CON_TYP, MAX, MIN, AVA, GIV, GIV_AVA, GIV_MAX, GIV_SHI, AVAILS
   , PAI_MAX, WOR, VAC, SIC, PAI, UNP, CMT, CAL, 'cmt shift coordinator'
@@ -290,7 +299,7 @@ WEEKDAY_ABREVATIONS = (
   ('mo', 'mon'), ('di', 'tue'), ('mi', 'wed'), ('do', 'thu'), ('fr', 'fri')
   , ('sa', 'sat'), ('so', 'sun')
 )
-WESTFALEN = ('Osnabrück', 'Münster', 'Bielefeld')
+WESTFALEN = ('Bielefeld', 'Münster', 'Osnabrück')
 # -------------------------------------
 
 # -------------------------------------
@@ -336,6 +345,7 @@ CON_BY_N = defaultdict(
     , 'TE Werkstudent': (12, 20)
     , 'TE WS': (12, 20)
     , 'TE Midijob': (12, 28)
+    , 'Midi-Jobber': (12, 28)
     , 'Foodora_Midijob': (12, 40)
     , 'Midijob': (12, 40)
     , 'TE Teilzeit': (30, 48)
@@ -343,6 +353,7 @@ CON_BY_N = defaultdict(
     , 'Vollzeit': (30, 48)
   }
 )
+CONTRACTS = list(CON_BY_N.keys())
 EXTRA_HOURS_BEGIN = defaultdict(int, {21: 1, 22: .5})
 EXTRA_HOURS_END = {21: 1, 22: 1, 23: 1, 24: .5, 25: 0, 26: 0}
 LGD_ARGS = {
@@ -669,6 +680,14 @@ def invalid_city_xlsx_filename(filename, city):
 # -------------------------------------
 
 # -------------------------------------
+def invalid_month_xlsx(df_mon, month, fn_cf):
+  return not (
+    df_mon is None
+    or any(fuzz.token_set_ratio(month, word) > 95 for word in fn_cf.split(' '))
+  )
+# -------------------------------------
+
+# -------------------------------------
 def load_avail_xlsx_into_df(df):
   df[USER_T] = df[USER_T].apply(lambda x: x.strip().replace('Foodora_', ''))
   df.loc[df[USER_T] == 'TE Werkstudent', USER_T] = 'TE WS'
@@ -679,7 +698,7 @@ def load_avail_xlsx_into_df(df):
 def load_decrpyted_xlsx(file_path):
   global PW
   df = None
-  print('file is encrypted... decrypting')
+  print(f'file is encrypted... decrypt {basename(file_path)}')
   tries = 5
   while tries != 0:
     try:
@@ -740,10 +759,11 @@ def load_shift_xlsx_into_df(df):
 # -------------------------------------
 
 # -------------------------------------
-def load_xlsx_data_into_dfs(city, dirs, dfs):
+def load_xlsx_data_into_dfs(dfs, kw_date, city, dirs):
+  month = MONTHS[kw_date.month]
   dfs[MON] = None
   duplicates = []
-  mendatory = list(MENDATORY)
+  mendatory = [*MENDATORY]
   for filename in os.listdir(dirs[0]):
     fn_cf = filename.casefold().replace('_', ' ').replace('-', ' ')
     if invalid_city_xlsx_filename(fn_cf, city):
@@ -761,14 +781,16 @@ def load_xlsx_data_into_dfs(city, dirs, dfs):
     df.rename(columns=lambda x: str(x).strip(), inplace=True)
     cols = {*df.columns}
     if USER_N in cols:
-      df, duplicates = loaded_xls_remove_dupls(df, AVA, filename, duplicates)
+      df, duplicates = load_xlsx_remove_dupls(df, AVA, filename, duplicates)
       dfs[AVA] = load_avail_xlsx_into_df(df)
       mendatory.remove(AVAIL)
     elif SH_DA in cols:
       dfs[SHI] = load_shift_xlsx_into_df(df)
       mendatory.remove(SHIFT)
     elif CON_H in cols:
-      df, duplicates = loaded_xls_remove_dupls(df, MON, filename, duplicates)
+      if invalid_month_xlsx(dfs[MON], month, fn_cf):
+        continue
+      df, duplicates = load_xlsx_remove_dupls(df, MON, filename, duplicates)
       dfs[MON] = load_month_xlsx_into_df(df)
   if duplicates:
     dfs[LOG] += print_log(parse_duplicates_msg(duplicates))
@@ -780,7 +802,7 @@ def load_xlsx_data_into_dfs(city, dirs, dfs):
 # -------------------------------------
 
 # -------------------------------------
-def loaded_xls_remove_dupls(df, src, filename, duplicates):
+def load_xlsx_remove_dupls(df, src, filename, duplicates):
   name_col, id_col = (USER_N, U_ID) if src == AVA else (DRI, DR_ID)
   df.sort_values([name_col, id_col], inplace=True)
   dupl = df.duplicated(name_col, keep='last')
@@ -817,7 +839,7 @@ def parse_city_ee_filepath(city):
 
 # -------------------------------------
 def parse_city_runtime(city, start):
-  return f'runtime {city = }: {time.perf_counter() - start:.2f} s'
+  return f'runtime {city = }: {perf_counter() - start:.2f} s'
 # -------------------------------------
 
 # -------------------------------------
@@ -843,7 +865,7 @@ def parse_progress_bar(bar_len, prog, pre, suf):
 
 # -------------------------------------
 def parse_run_end_msg(start):
-  return f'TOTAL RUNTIME: {time.perf_counter() - start:.2f} s'
+  return f'TOTAL RUNTIME: {perf_counter() - start:.2f} s'
 # -------------------------------------
 
 # -------------------------------------
@@ -858,38 +880,30 @@ def parse_stats_msg(counter):
 # -------------------------------------
 
 # -------------------------------------
-def plot_data_day_update(data, labels):
-  day_labels = copy.deepcopy(labels)
-  data = np.array([list(time_data.values()) for time_data in data.values()])
-  for cntr, cnt in zip(range(len(labels) - 1, -1, -1), np.sum(data, 0)[::-1]):
-    if int(cnt) == 0:
-      data = np.delete(data, cntr, 1)
-      del day_labels[cntr]
-  return data, np.cumsum(data, axis=1), day_labels
+def plot_data_day_update(data):
+  arr = np.transpose(np.array(list(data.values())))
+  return arr, np.cumsum(arr, axis=1), data.keys()
 # -------------------------------------
 
 # -------------------------------------
-def plot_initial_data_dict(dfs, labels, times):
-  data_dict = {}
-  times_set = {*times}
-  for day in WEEKDAYS_EN:
-    data_dict[day] = {}
-    for time in times:
-      data_dict[day][time] = {}
-      for contract in labels:
-        data_dict[day][time][contract] = 0
-  for day, df_row in dfs[SHI].iterrows():
+def plot_get_day_times(s_time, e_time):
+  return np.array([(1 if s_time <= tme < e_time else 0) for tme in REL_TIME])
+# -------------------------------------
+
+# -------------------------------------
+def plot_initial_data_dict(dfs):
+  cnts = [0] * 22
+  data = {day: defaultdict(lambda: np.array(cnts)) for day in WEEKDAYS_EN}
+  for day, row in dfs[SHI].iterrows():
     try:
-      contract = dfs[REP].at[df_row[DRI], CON_TYP]
+      contract = dfs[REP].at[row[DRI], CON_TYP]
     except KeyError:
       continue
-    start_time = datetime.combine(_now, df_row[FR_HO])
-    end_time = datetime.combine(_now, df_row[TO_HO])
-    for dt_obj in pd.date_range(start_time, end_time, freq='30min'):
-      time = dt_obj.strftime('%H:%M')
-      if time in times_set:
-        data_dict[day][time][contract] += 1
-  return data_dict
+    data[day][contract] += plot_get_day_times(row[FR_HO], row[TO_HO])
+  return {
+    day: {k: v for cont in CONTRACTS for k, v in day_data.items() if k == cont}
+    for day, day_data in data.items()
+  }
 # -------------------------------------
 
 # -------------------------------------
@@ -917,21 +931,18 @@ def plot_partial_bar_count(ax, color, widths, xcenters):
 def plot_shift_distribution(dfs, city, kw, year, kw_dir):
   log = print_log_header(PLOT_SHIFTS_MSG)
   ana_dir = check_make_dir(kw_dir, 'Analyse')
-  contracts = dfs[REP][CON_TYP].unique()
   dates_obj_list = [date.fromisocalendar(year, kw, i) for i in range(1, 8)]
   dates_DE = [date_obj.strftime(DMY) for date_obj in dates_obj_list]
-  labels = [cont for ref_c in CON_BY_N for cont in contracts if cont == ref_c]
-  times = TIMES[22][:-1]
-  data_dict = plot_initial_data_dict(dfs, labels, times)
-  for idx, day_dict in enumerate(data_dict.values()):
-    data, data_cumsum, day_labels = plot_data_day_update(day_dict, labels)
+  y_axis_labels = TIMES[22][:-1]
+  for idx, day_dict in enumerate(plot_initial_data_dict(dfs).values()):
+    data, data_cumsum, day_labels = plot_data_day_update(day_dict)
     if data_cumsum.shape[1] == 0:
       continue
     target_fn = f'{city}_{dates_obj_list[idx]}.png'
     totals = data_cumsum[:, -1]
     peak_cnt = totals.max()
     ax = plot_init_subplot(city, year, kw, dates_DE[idx], WEEKDAYS[idx])
-    ax = plot_stacked_bars(ax, data, data_cumsum, day_labels, times)
+    ax = plot_stacked_bars(ax, data, data_cumsum, day_labels, y_axis_labels)
     ax = plot_total_bar_counts(ax, totals)
     ax.legend(day_labels, ncol=len(day_labels), **LGD_ARGS)
     plt.xlim(0, max(peak_cnt + 1, min(peak_cnt * 1.08, peak_cnt + 5)))
@@ -1442,6 +1453,11 @@ def print_progress_bar(bar_data, row_cnt, row_n):
 # -------------------------------------
 
 # -------------------------------------
+def print_unknown_dir_msg(path):
+  print(f'##### Couldn`t find "{path}"{BR}')
+# -------------------------------------
+
+# -------------------------------------
 def processed_ocr_data_to_logfile(data, city, kw_dir):
   writer = pd.ExcelWriter(join(kw_dir, f'{city}_{START_DT}.xlsx'))
   pd.DataFrame(data, columns=DF_DET_COLS).to_excel(writer, city, index=False)
@@ -1492,7 +1508,7 @@ def process_screenshots(ref_data, city, kw, year, dirs):
 # -------------------------------------
 def process_xlsx_data(dfs, kw_date, city, dirs):
   dfs[LOG] += print_log_header(PROCESS_XLSX_MSG)
-  dfs = load_xlsx_data_into_dfs(city, dirs, dfs)
+  dfs = load_xlsx_data_into_dfs(dfs, kw_date, city, dirs)
   if dfs.get(EE, None) is None:
     return dfs
   dfs = rider_ee_update_names(kw_date, city, dfs)
@@ -1710,7 +1726,7 @@ def screenshots_merge_daily_files(city, dirs):
 
 # -------------------------------------
 def shiftplan_check(city, kw, year, dirs, run_args):
-  start = time.perf_counter()
+  start = perf_counter()
   dfs = {LOG: print_log_sp_check_msg(city, kw, year)}
   get_ava, merge, tidy_only, ee_only, visualize = run_args
   if city in WESTFALEN:
@@ -1923,20 +1939,23 @@ def tidy_zip_files(city, dirs):
 # -------------------------------------
 def update_directories(city, kw_dir):
   if city in WESTFALEN:
-    kw_dir = join(kw_dir, city)
-    log_dir = check_make_dir(kw_dir, 'logs')
-    screen_dir = png_dir = None
+    city_kw_dir = join(kw_dir, city)
     try:
-      os.rename(kw_dir.replace('ü', 'Б'), kw_dir)
+      os.rename(join(kw_dir, city.replace('ü', 'Б')), city_kw_dir)
     except FileNotFoundError:
       pass
-    for fn in os.listdir(kw_dir):
-      os.rename(join(kw_dir, fn), join(kw_dir, fn.replace("Б", "ü")))
+    if not exists(city_kw_dir):
+      print_unknown_dir_msg(city_kw_dir)
+      return None
+    screen_dir = png_dir = None
+    for fn in os.listdir(city_kw_dir):
+      os.rename(join(city_kw_dir, fn), join(city_kw_dir, fn.replace("Б", "ü")))
   else:
-    log_dir = check_make_dir(kw_dir, 'logs')
-    screen_dir = join(kw_dir, 'Screenshots')
+    city_kw_dir = kw_dir
+    screen_dir = join(kw_dir, SCREENS)
     png_dir = check_make_dir(screen_dir, city)
-  return [kw_dir, log_dir, screen_dir, png_dir]
+  log_dir = join(city_kw_dir, LOGS)
+  return city_kw_dir, log_dir, screen_dir, png_dir
 # -------------------------------------
 
 # -------------------------------------
@@ -1958,22 +1977,24 @@ def yield_run_kws(start_year, last_year, start_kw, last_kw):
 # =================================================================
 # -------------------------------------
 def sp_control(start_year, last_year, start_kw, last_kw, cities, *run_args):
-  start = time.perf_counter()
+  start = perf_counter()
   print_log_header(INITIAL_MSG, pre='=', suf='=')
   for year, kw in yield_run_kws(start_year, last_year, start_kw, last_kw):
-    kw_dir = join(BASE_DIR, 'Schichtplan_Daten', str(year), f'KW{kw}')
+    kw_dir = join(BASE_DIR, SP_DATA, str(year), f'KW{kw}')
     if not exists(kw_dir):
-      print(f'##### Couldn`t find "{kw_dir}"{BR}')
+      print_unknown_dir_msg(kw_dir)
       continue
     for city in cities:
       dirs = update_directories(city, kw_dir)
+      if dirs is None:
+        continue
       try:
         log = shiftplan_check(city, kw, year, dirs, run_args)
       except KeyboardInterrupt:
         raise
       except Exception as ex:
         log = print_log(f'{parse_break_line("#")}{NL}{repr(ex)=}{NL}{BRK}')
-      log_path = join(dirs[1], f'{city}_{START_DT}.log')
+      log_path = join(check_make_dir(dirs[1]), f'{city}_{START_DT}.log')
       with open(log_path, 'w', encoding='utf-8') as logfile:
         logfile.write(log)
   print_log_header(parse_run_end_msg(start), pre='=', suf='=', brk=NL)
@@ -1984,7 +2005,7 @@ def main():
   from argparse import ArgumentParser
   parser = ArgumentParser()
   parser.add_argument('-y', '--start_year', type=int, default=YEAR, help=P_Y)
-  parser.add_argument('-z', '--last_year', type=int, default=YEAR, help=P_Z)
+  parser.add_argument('-z', '--last_year', type=int, default=0, help=P_Z)
   parser.add_argument('-k', '--start_kw', type=int, default=KW, help=P_KW)
   parser.add_argument('-l', '--last_kw',  type=int, default=0, help=P_LKW)
   parser.add_argument('-c', '--cities', nargs='*', default=DEF_CITY, help=P_C)

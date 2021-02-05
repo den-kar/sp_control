@@ -568,10 +568,9 @@ def get_base_data_from_mon(name, df_row):
     work_ratio = float(str(df_row[WO_RA]).strip('%'))
     if work_ratio > 5: 
       work_ratio /= 100
+    work_ratio = round(work_ratio, 2)
   except ValueError:
     work_ratio = 0
-  finally:
-    work_ratio = round(work_ratio, 2)
   return {**base_data, PAI_MAX: work_ratio}
 # -------------------------------------
 
@@ -1154,7 +1153,7 @@ def png_image_variations_yield_ocr_name(cv_data):
   if np.mean(frame) < 245:
     for i in range(195, 208):
       frame[frame == i] = 255
-    yield png_image_prep_ocr_string(frame, cv_data[NP])
+    yield 'inverted', png_image_prep_ocr_string(frame, cv_data[NP])
     start_n = 2
   else:
     start_n = 0
@@ -1483,6 +1482,8 @@ def png_values_yield_pngs(ref_data, city, kw, year, png_dir):
     if DEV >= 1:
       print(f'{png=}'.center(80, '='))
     day, file_suf = png.split('_')
+    if FILEIDX is not None and FILEIDX != file_suf.split('.')[0] or day not in DAYS:
+      continue
     date_str = parse_date(day, kw_dates)
     img = png_values_imread(png, png_dir)
     image_vals = png_values_image_values(date_str, img, ref_data)
@@ -2098,7 +2099,7 @@ def update_directories(city, kw_dir):
     city_kw_dir = kw_dir
     screen_dir = join(kw_dir, SCREENS)
     png_dir = check_make_dir(screen_dir, city)
-  log_dir = join(city_kw_dir, LOGS)
+  log_dir = check_make_dir(city_kw_dir, LOGS)
   return city_kw_dir, log_dir, screen_dir, png_dir
 # -------------------------------------
 
@@ -2132,14 +2133,9 @@ def sp_control(start_year, last_year, start_kw, last_kw, cities, *run_args):
       dirs = update_directories(city, kw_dir)
       if dirs is None:
         continue
-      try:
-        log = shiftplan_check(city, kw, year, dirs, run_args)
-      except KeyboardInterrupt:
-        raise
-      except Exception as ex:
-        log = print_log(f'{parse_break_line("#")}{NL}{repr(ex)=}{NL}{BRK}')
+      log = shiftplan_check(city, kw, year, dirs, run_args)
       if DEV == 0:
-        log_path = join(check_make_dir(dirs[1]), f'{city}_{START_DT}.log')
+        log_path = join(dirs[1], f'{city}_{START_DT}.log')
         with open(log_path, 'w', encoding='utf-8') as logfile:
           logfile.write(log)
   print_log_header(parse_run_end_msg(start), pre='=', suf='=', brk=NL)
@@ -2171,8 +2167,8 @@ def main():
   for key, value in arg_dict.items():
     print(f':::::   {key}:{(28 - len(key)) * " "}{value}')
   print(''.center(80, '.'))
-  global DEV, EIV, DAYS, ROW, ENDROW, SAVE_REP
-  *args, DEV, EIV, DAYS, file_idx, ROW, ENDROW, SAVE_REP = arg_dict.values()
+  global DEV, EIV, DAYS, FILEIDX, ROW, ENDROW, SAVE_REP
+  *args, DEV, EIV, DAYS, FILEIDX, ROW, ENDROW, SAVE_REP = arg_dict.values()
   if DEV >= 1:
     SAVE_REP = False
     print(''.center(80, '-'))
@@ -2184,8 +2180,8 @@ def main():
   if DEV >= 4:
     if DAYS == WEEKDAYS:
       DAYS = ['Montag']
-    if file_idx is None:
-      file_idx = '1'
+    if FILEIDX is None:
+      FILEIDX = '1'
   sp_control(*args)
 # -------------------------------------
 # =================================================================

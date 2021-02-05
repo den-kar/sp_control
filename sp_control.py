@@ -554,10 +554,9 @@ def get_base_data_from_mon(name, df_row):
     work_ratio = float(str(df_row[WO_RA]).strip('%'))
     if work_ratio > 5: 
       work_ratio /= 100
+    work_ratio = round(work_ratio, 2)
   except ValueError:
     work_ratio = 0
-  finally:
-    work_ratio = round(work_ratio, 2)
   return {**base_data, PAI_MAX: work_ratio}
 # -------------------------------------
 
@@ -1954,7 +1953,7 @@ def update_directories(city, kw_dir):
     city_kw_dir = kw_dir
     screen_dir = join(kw_dir, SCREENS)
     png_dir = check_make_dir(screen_dir, city)
-  log_dir = join(city_kw_dir, LOGS)
+  log_dir = check_make_dir(city_kw_dir, LOGS)
   return city_kw_dir, log_dir, screen_dir, png_dir
 # -------------------------------------
 
@@ -1988,13 +1987,8 @@ def sp_control(start_year, last_year, start_kw, last_kw, cities, *run_args):
       dirs = update_directories(city, kw_dir)
       if dirs is None:
         continue
-      try:
-        log = shiftplan_check(city, kw, year, dirs, run_args)
-      except KeyboardInterrupt:
-        raise
-      except Exception as ex:
-        log = print_log(f'{parse_break_line("#")}{NL}{repr(ex)=}{NL}{BRK}')
-      log_path = join(check_make_dir(dirs[1]), f'{city}_{START_DT}.log')
+      log = shiftplan_check(city, kw, year, dirs, run_args)
+      log_path = join(dirs[1], f'{city}_{START_DT}.log')
       with open(log_path, 'w', encoding='utf-8') as logfile:
         logfile.write(log)
   print_log_header(parse_run_end_msg(start), pre='=', suf='=', brk=NL)

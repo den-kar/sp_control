@@ -58,14 +58,17 @@ def extract_sheet_kpi_data(df_kpi, df_sheet):
   df_sheet[IDX_COL[3]] = format_time(df_sheet)
   cols = df_sheet.columns.to_list()
   time_data_idx = cols.index('0')
-  *string_data_cols, kpi_col = cols[:time_data_idx]
-  df_sheet.rename(columns={kpi_col: KPI}, inplace=True)
-  for string_data_col in string_data_cols:
-    df_sheet[string_data_col].fillna(method='ffill', inplace=True)
-    if string_data_col not in IDX_COL:
-      df_sheet[string_data_col].fillna('', inplace=True)
-      string_KPIs.append(string_data_col)
-  df_sheet.loc[:, VAL] = df_sheet.sum(axis=1, numeric_only=True)
+  *str_kpi_cols, unnamed_col = cols[:time_data_idx]
+  df_sheet.rename(columns={unnamed_col: KPI}, inplace=True)
+  kpi_cnt = df_sheet[KPI].nunique()
+  for str_kpi_col in str_kpi_cols:
+    if str_kpi_col in IDX_COL:
+      df_sheet[str_kpi_col].fillna(method='ffill', inplace=True)
+    else:
+      df_sheet[str_kpi_col].fillna(method='ffill', inplace=True, limit=kpi_cnt)
+      df_sheet[str_kpi_col].fillna('', inplace=True)
+      string_KPIs.append(str_kpi_col)
+  df_sheet[VAL] = df_sheet.sum(axis=1, numeric_only=True)
   df_pivot = df_sheet.pivot(index=IDX_COL, columns=KPI, values=VAL)
   if df_kpi is None:
     df_kpi = df_pivot
@@ -97,14 +100,24 @@ def kpi_data_to_formated_xlsx(df_kpi, out_path):
   workbook = writer.book
   perc_fmt = workbook.add_format()
   perc_fmt.set_num_format(10)
+  float_fmt = workbook.add_format()
+  float_fmt.set_num_format('0.0000')
   worksheet = writer.sheets['overview']
   worksheet.autofilter(0, 0, 0, len(cols) + 3)
   worksheet.set_zoom(65)
   worksheet.freeze_panes(1, 4)
-  index_widths = [(x, int(len(x) * 1.25)) for x in df_kpi.index.names]
-  widths = [(x, int(len(x) * (1.5 if x == LARGE_COL else 1.25))) for x in cols]
-  for n, (col, width) in enumerate(index_widths + widths):
-    worksheet.set_column(n, n, width, perc_fmt if col.endswith('%') else {})
+  index_widths = ((x, int(len(x) * 1.25)) for x in df_kpi.index.names)
+  for n, (col, width) in enumerate(index_widths):
+    worksheet.set_column(n, n, width)
+  widths = ((x, int(len(x) * (1.5 if x == LARGE_COL else 1.25))) for x in cols)
+  for n, (col, width) in enumerate(widths, 4):
+    if col.endswith('%'):
+      col_fmt = perc_fmt
+    elif df_kpi[col].dtype == 'float64':
+      col_fmt = float_fmt
+    else:
+      col_fmt = {}
+    worksheet.set_column(n, n, width, col_fmt)
   writer.save()
 # -------------------------------------
 

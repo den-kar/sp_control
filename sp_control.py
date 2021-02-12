@@ -461,8 +461,8 @@ XLS_REPORT_COND_FMT = (
 # -------------------------------------
 if exists(CONFIG_FP):
   import json
-  with open(CONFIG_FP, encoding='utf-8') as file_path:
-    config = json.load(file_path)
+  with open(CONFIG_FP, encoding='utf-8') as config_file:
+    config = json.load(config_file)
   ALIAS = {k: tuple(x for x in alis) for k, alis in config['aliases'].items()}
   DEF_CITY = config['cities']
   if 'win' in sys.platform:
@@ -1829,6 +1829,7 @@ def tidy_filename_query(fn):
 def tidy_jpg_files(city, dirs):
   jpg_files = [fn for fn in os.listdir(dirs[0]) if fn.endswith('.jpg')]
   if not jpg_files:
+    print('no jpgs')
     return ''
   log = print_log_header(TIDY_JPG_MSG)
   log += print_log(JPG_NAME_CHECK_MSG, '|JPG| ')

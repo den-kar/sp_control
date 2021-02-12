@@ -471,8 +471,8 @@ XLS_REPORT_COND_FMT = (
 # -------------------------------------
 if exists(CONFIG_FP):
   import json
-  with open(CONFIG_FP, encoding='utf-8') as file_path:
-    config = json.load(file_path)
+  with open(CONFIG_FP, encoding='utf-8') as config_file:
+    config = json.load(config_file)
   ALIAS = {k: tuple(x for x in alis) for k, alis in config['aliases'].items()}
   DEF_CITY = config['cities']
   if 'win' in sys.platform:

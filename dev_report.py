@@ -275,7 +275,7 @@ CONVERT_COLS_MONTH = (
   , (PAI, 'Total paid hours')
   , (UNP, 'Unpaid leaves (hours)')
 )
-DF_DET_COLS = ('kw', CIT, 'day', 'index', 'row', 'avail', 'name', 'ocr')
+DF_DET_COLS = (CIT, 'kw', 'day', 'index', 'row', 'avail', 'name', 'ocr')
 DIGITS = {*map(str, range(10))}
 INVALID_WORDS = {'wochenstunden', 'gefahrene'}
 MENDATORY = (AVAIL, SHIFT)
@@ -347,12 +347,12 @@ CON_BY_N = defaultdict(
     , 'Foodora_Minijob': (_mini_min_h, 15)
     , 'Minijob': (_mini_min_h, 15)
     , 'Minijobber': (5, 11)
-    , 'Mini-Jobber': (5, 11)
+    , 'Mini-Jobber': (9, 11)
     , 'TE Minijob': (5, 11)
     , 'Foodora_Working Student': (12, 20)
     , 'Werk Student': (12, 20)
-    , 'Working Student': (12, 20)
-    , 'Working-Student': (12, 20)
+    , 'Working Student': (0, 20)
+    , 'Working-Student': (0, 20)
     , 'TE Werkstudent': (12, 20)
     , 'TE WS': (12, 20)
     , 'TE Midijob': (12, 28)
@@ -360,7 +360,7 @@ CON_BY_N = defaultdict(
     , 'Midijob': (12, 40)
     , 'TE Teilzeit': (30, 48)
     , 'Teilzeit': (30, 48)
-    , 'Vollzeit': (30, 48)
+    , 'Vollzeit': (35, 48)
   }
 )
 CONTRACTS = list(CON_BY_N.keys())
@@ -1001,12 +1001,13 @@ def png_grid_capture_cols(rows, left, img):
   if row_cnt <= 1:
     return None, None, None
   # ----- use found rows with offset as y value, start at the middle row -----
+  x_max = img_width - 4
   for row_n in range(row_cnt // 2, row_cnt):
     cols.clear()
     row_height = rows[row_n] - rows[row_n - 1]
     bot_margin = 4 if row_n == (row_cnt - 1) else 2
   # ----- horizontal iteration, skip unnecessary parts, get x values of cols --
-    for x in range(left + 8 * row_height, img_width - 4):
+    for x in range(left + 8 * row_height, x_max):
       pixel_color = img[rows[row_n] - bot_margin, x]
       if DEV == 4 and pixel_color not in COLOR[WHITE] | COLOR[FILLED]:
         print(f'y={rows[row_n]}, {x=}, {pixel_color=}, not white or filled')
@@ -1023,6 +1024,9 @@ def png_grid_capture_cols(rows, left, img):
         if x <= cols[-1] + 2:
           del cols[-1]
         break
+      elif x == x_max - 1:
+        del cols[-1]
+        break
     if len(cols) >= 21:
       break
   if DEV == 4:
@@ -1034,8 +1038,9 @@ def png_grid_capture_cols(rows, left, img):
 
 # -------------------------------------
 def png_grid_capture_rows(img):
-  height = img.shape[0]
+  height, width = img.shape
   height_thresh = height // 2
+  height_tolerance = 115 if height < .7 * width else height_thresh
   left = 0
   rows = []
   skip = False
@@ -1072,7 +1077,7 @@ def png_grid_capture_rows(img):
             print(f'skip vertical thin line at {x =}')
           break
   # ----- check break condition, continue if y > height threshold -----
-      if y <= rows[-1] - (40 if y < height_thresh else 112):
+      if y <= rows[-1] - (40 if y < height_thresh else height_tolerance):
         if DEV == 4:
           print(f'reached blank area at {y = }')
         if len(rows) > 1:
@@ -1493,7 +1498,7 @@ def png_values_yield_pngs(ref_data, city, kw, year, png_dir):
       **image_vals
       , DATE: date_str
       , IMG: img
-      , LOG_DATA: [day, int(file_suf.split('.')[0]), kw, city, None]
+      , LOG_DATA: [city, kw, day, int(file_suf.split('.')[0]), None]
       , BAR: [png, len(pngs), png_n]
       , PNG: png
       , PNG_N: png_n

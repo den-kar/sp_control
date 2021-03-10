@@ -1040,7 +1040,7 @@ def png_grid_capture_cols(rows, left, img):
         if x <= cols[-1] + 2:
           del cols[-1]
         break
-      elif (x == x_max - 1) and (len(cols) < 22):
+      elif (x == x_max - 1) and (len(cols) > 22):
         del cols[-1]
         break
     if len(cols) >= 21:

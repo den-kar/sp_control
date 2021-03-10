@@ -33,6 +33,7 @@ from xlrd.biffh import XLRDError
 # -------------------------------------
 # ### DATE AND TIME RELATED ###
 # -------------------------------------
+DM = '%d.%m.'
 DMY = '%d.%m.%Y'
 HM = '%H:%M'
 HMS = HM + ':%S'
@@ -62,6 +63,7 @@ AVA = 'avail'
 AVAIL = 'Verfügbarkeiten'
 AVAILS = 'availablities'
 AV_ARGS = 'row_availability_args'
+AWAY = 'leave'
 BAD_RESO = 'bad_resolution'
 BAR = 'progress_bar_data'
 BG_COL = 'bg_color'
@@ -100,6 +102,7 @@ FI_ENT = 'first entry'
 FMT = 'format'
 FO_SI = 'font_size'
 FRAME = 'histgram_test_frame'
+FR = 'From'
 FR_HO = 'From Hour'
 GIV = 'given'
 GIV_AVA = 'given/avail'
@@ -141,6 +144,7 @@ MUL_MAT = 'MULTIPLE MATCHES '
 NA = 'N/A'
 NAME_ARGS = 'cv_data_args'
 NAME_BOX = 'name_box_in_av_cells'
+NEW_AV = 'Availability_hr'
 NF = 'NOT FOUND '
 NL = '\n'
 NOAV = 'no_avail'
@@ -185,6 +189,7 @@ P_TO = 'Räumt alle Verfügbarkeiten Screenshot Dateien auf'
 P_V = 'Daten Visualisierung, erstellt Plots der vergebenen Schichten'
 P_Y = 'Jahr der zu prüfenden Daten, default: heutiges Jahr'
 P_Z = 'Letztes Jahr der zu prüfenden Daten, default: heutiges Jahr'
+REAS = 'Reason'
 REDUCE_HOURS = ' -> auf Min.Std. reduzieren'
 REF = 'reference_data'
 REP = 'report'
@@ -214,6 +219,7 @@ TAB = '\t'
 TIDY_JPG_MSG = ' TIDY JPGS IN WORKING DIRECTORY '
 TIDY_PNG_MSG = ' TIDY PNGS IN WORKING DIRECTORY '
 TIME_CELL = 'header_time_cell'
+TO = 'To'
 TOP = 'top'
 TO_HO = 'To Hour'
 TYP = 'type'
@@ -361,6 +367,9 @@ LGD_ARGS = {
   , 'loc': 'upper center'
   , 'fontsize': 'small'
   , 'facecolor': '#e5e5e5'
+}
+LEAVE_TYPES = {
+  'free': 'Unbezahlte Freizeit', 'vacation': 'Urlaub', 'sick': 'Krankheit'
 }
 LGD_COLORS = dict(zip(
   CON_BY_N.keys()
@@ -576,9 +585,9 @@ def get_contract_and_avail_h(name, df_row, df_ava):
 # -------------------------------------
 
 # -------------------------------------
-def get_data_check_and_first_comment(data):
+def get_data_check_and_first_comment(data, leave_str):
   call = ''
-  comment = []
+  comment = [leave_str] if leave_str else []
   min_h = get_data_check_min_h(data)
   if data[GIV_MAX] > 1 and data[MAX] != 40:
     call = 'X'
@@ -674,7 +683,10 @@ def invalid_city_xlsx_filename(filename, city):
     not filename.endswith('xlsx')
     or not filename[0].isalpha()
     or any(invalid_word in filename for invalid_word in INVALID_WORDS)
-    or all(fuzz.partial_ratio(alias, filename) <= 86 for alias in ALIAS[city])
+    or (
+      (filename == NEW_AV)
+      or all(fuzz.partial_ratio(alias, filename) < 87 for alias in ALIAS[city])
+    )
   )
 # -------------------------------------
 
@@ -738,6 +750,26 @@ def load_ersterfassung_xlsx_into_df(city):
 # -------------------------------------
 
 # -------------------------------------
+def load_leave_xlsx_into_dict(df, kw_dates):
+  leaves = defaultdict(str)
+  df[FR] = pd.to_datetime(df[FR], format=DMY).dt.date
+  df[TO] = pd.to_datetime(df[TO], format=DMY).dt.date
+  for _, data in df.iterrows():
+    name = data[DRI]
+    if leaves[name] == '':
+      leave_str = LEAVE_TYPES[data[REAS]] + ': '
+    else:
+      leave_str = leaves[name] + ', '
+    from_date = kw_dates[0] if data[FR] < kw_dates[0] else data[FR]
+    leave_str += from_date.strftime(DM)
+    if data[FR] != data[TO]:
+      to_date = kw_dates[-1] if data[TO] > kw_dates[-1] else data[TO]
+      leave_str += ' - ' + to_date.strftime(DM)
+    leaves[name] = leave_str
+  return leaves
+# -------------------------------------
+
+# -------------------------------------
 def load_month_xlsx_into_df(df):
   if CO_TY in df.columns:
     df[CO_TY] = df[CO_TY].apply(lambda x: x.strip().replace('Foodora_', ''))
@@ -758,9 +790,10 @@ def load_shift_xlsx_into_df(df):
 # -------------------------------------
 
 # -------------------------------------
-def load_xlsx_data_into_dfs(dfs, kw_date, city, dirs):
-  month = MONTHS[kw_date.month]
+def load_xlsx_data_into_dfs(dfs, kw_dates, city, dirs):
+  month = MONTHS[kw_dates[0].month]
   dfs[MON] = None
+  dfs[AWAY] = defaultdict(str)
   duplicates = []
   mendatory = [*MENDATORY]
   for filename in os.listdir(dirs[0]):
@@ -783,7 +816,7 @@ def load_xlsx_data_into_dfs(dfs, kw_date, city, dirs):
       df, duplicates = load_xlsx_remove_dupls(df, AVA, filename, duplicates)
       dfs[AVA] = load_avail_xlsx_into_df(df)
       mendatory.remove(AVAIL)
-    elif SH_DA in cols:
+    elif SH_DAY in cols:
       dfs[SHI] = load_shift_xlsx_into_df(df)
       mendatory.remove(SHIFT)
     elif CON_H in cols:
@@ -791,6 +824,8 @@ def load_xlsx_data_into_dfs(dfs, kw_date, city, dirs):
         continue
       df, duplicates = load_xlsx_remove_dupls(df, MON, filename, duplicates)
       dfs[MON] = load_month_xlsx_into_df(df)
+    elif REAS in cols:
+      dfs[AWAY] = load_leave_xlsx_into_dict(df, kw_dates)
   if duplicates:
     dfs[LOG] += print_log(parse_duplicates_msg(duplicates))
   if mendatory:
@@ -927,17 +962,16 @@ def plot_partial_bar_count(ax, color, widths, xcenters):
 # -------------------------------------
 
 # -------------------------------------
-def plot_shift_distribution(dfs, city, kw, year, kw_dir):
+def plot_shift_distribution(dfs, kw_dates, city, kw, year, kw_dir):
   log = print_log_header(PLOT_SHIFTS_MSG)
   ana_dir = check_make_dir(kw_dir, 'Analyse')
-  dates_obj_list = [date.fromisocalendar(year, kw, i) for i in range(1, 8)]
-  dates_DE = [date_obj.strftime(DMY) for date_obj in dates_obj_list]
+  dates_DE = [kw_date.strftime(DMY) for kw_date in kw_dates]
   y_axis_labels = TIMES[22][:-1]
   for idx, day_dict in enumerate(plot_initial_data_dict(dfs).values()):
     data, data_cumsum, day_labels = plot_data_day_update(day_dict)
     if data_cumsum.shape[1] == 0:
       continue
-    target_fn = f'{city}_{dates_obj_list[idx]}.png'
+    target_fn = f'{city}_{kw_dates[idx]}.png'
     totals = data_cumsum[:, -1]
     peak_cnt = totals.max()
     ax = plot_init_subplot(city, year, kw, dates_DE[idx], WEEKDAYS[idx])
@@ -994,6 +1028,8 @@ def png_grid_capture_cols(rows, left, img):
       if pixel_color in COLOR[TIME_CELL] | COLOR[SHI]:
         break
       if pixel_color in COLOR[LINE]:
+        if x == x_max - 1:
+          break
         if cols and x <= cols[-1] + 5:
           del cols[-1]
         cols.append(x)
@@ -1004,7 +1040,7 @@ def png_grid_capture_cols(rows, left, img):
         if x <= cols[-1] + 2:
           del cols[-1]
         break
-      elif x == x_max - 1:
+      elif (x == x_max - 1) and (len(cols) < 22):
         del cols[-1]
         break
     if len(cols) >= 21:
@@ -1043,7 +1079,7 @@ def png_grid_capture_rows(img):
           rows[0] = y
       else:
         vert_line_cnt += 1
-        if vert_line_cnt == 5:
+        if vert_line_cnt == 10:
           skip = True
           break
   # ----- check break condition, continue if y > height threshold -----
@@ -1208,8 +1244,9 @@ def png_name_similarity_check(hit, ocr_name, simil_names):
     method = 'ratio'
   else:
     method = 'WRatio'
+  char_cnt = len(ocr_name)
   for name in (hit, *simil_names):
-    similarity = getattr(fuzz, method)(ocr_name, name)
+    similarity = getattr(fuzz, method)(ocr_name, name[:char_cnt])
     if similarity > 95:
       return name
     if similarity > highest:
@@ -1239,7 +1276,7 @@ def png_row_availabities(top, bot, cols, col_cnt, date_str, img):
       if not in_availablity_block:
         daily_avail += f'{date_str} | {TIMES[col_cnt][col_idx]}'
         in_availablity_block = True
-      elif col_idx == col_cnt - 1:
+      if col_idx == col_cnt - 1:
         extra_hours += EXTRA_HOURS_END[col_cnt]
         daily_avail += f' - {TIMES[col_cnt][-1]} | {hours_block:.1f}h{NL}'
         daily_hours += hours_block
@@ -1489,7 +1526,7 @@ def process_rider_data(name, df_row, src, dfs):
   data.update(get_min_hours(dfs[EE], dfs[REF][3], data[CON_TYP], name))
   data.update(get_shifts(dfs[SHI], data[ID]))
   data.update(get_given_hour_ratios(data[AVA], data[GIV], data[MAX]))
-  data.update(get_data_check_and_first_comment(data))
+  data.update(get_data_check_and_first_comment(data, dfs[AWAY][data[RID_NAM]]))
   return data
 # -------------------------------------
 
@@ -1510,13 +1547,13 @@ def process_screenshots(ref_data, city, kw, year, dirs):
 # -------------------------------------
 
 # -------------------------------------
-def process_xlsx_data(dfs, kw_date, city, dirs):
+def process_xlsx_data(dfs, kw_dates, city, dirs):
   dfs[LOG] += print_log_header(PROCESS_XLSX_MSG)
-  dfs = load_xlsx_data_into_dfs(dfs, kw_date, city, dirs)
+  dfs = load_xlsx_data_into_dfs(dfs, kw_dates, city, dirs)
   if dfs.get(EE, None) is None:
     return dfs
-  dfs = rider_ee_update_names(kw_date, city, dfs)
-  dfs[REF] = reference_names_and_contract_data(dfs[EE], kw_date)
+  dfs = rider_ee_update_names(kw_dates[0], city, dfs)
+  dfs[REF] = reference_names_and_contract_data(dfs[EE], kw_dates[0])
   dfs[REP] = processed_xlsx_data_to_report_df(dfs)
   return dfs
 # -------------------------------------
@@ -1554,7 +1591,7 @@ def rider_ee_get_similar_names(new_names, df_ee):
   simils = dict(zip(all_names, df_ee[SIM_NAM]))
   for new in new_names:
     for name in all_names:
-      if fuzz.ratio(new, name) <= 78 or name == new or name in simils[new]:
+      if name == new or name in simils[new] or fuzz.ratio(new, name) <= 78:
         continue
       simils[new] += ('' if simils[new] == '' else ';') + name
       print(f'-----{TAB} found similar name | {new=}, {name}')
@@ -1739,15 +1776,15 @@ def shiftplan_check(city, kw, year, dirs, run_args):
     dfs[LOG] += tidy_screenshot_files(city, dirs, merge)
   if tidy_only:
     return shiftplan_check_log_city_runtime(city, start, dfs[LOG])
-  kw_date = date.fromisocalendar(year, kw, 1)
-  dfs = process_xlsx_data(dfs, kw_date, city, dirs)
+  kw_dates = [date.fromisocalendar(year, kw, n) for n in range(1, 8)]
+  dfs = process_xlsx_data(dfs, kw_dates, city, dirs)
   if dfs.get(REP, None) is None:
     return shiftplan_check_log_city_runtime(city, start, dfs[LOG])
   if visualize:
-    dfs[LOG] += plot_shift_distribution(dfs, city, kw, year, dirs[0])
+    dfs[LOG] += plot_shift_distribution(dfs, kw_dates, city, kw, year, dirs[0])
   if get_ava and TESSERACT_AVAILABLE:
     data = process_screenshots(dfs[REF], city, kw, year, dirs)
-    dfs = shiftplan_report_png_data_update(dfs, data, kw_date, city)
+    dfs = shiftplan_report_png_data_update(dfs, data, kw_dates[0], city)
   rider_ee_to_formated_xlsx(city, dfs[EE])
   if not ee_only:
     dfs[REP] = shiftplan_report_remove_unnecessary(dfs[REP])
